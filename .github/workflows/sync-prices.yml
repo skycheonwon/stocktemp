@@ -1,9 +1,9 @@
-name: Sync Stock Prices to Firestore
+name: Sync Stock Prices & AI Analysis (Weekly)
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Run every 10 minutes
-  workflow_dispatch:        # Allow manual triggering
+    - cron: '0 0 * * 6'  # 매주 토요일 00:00 UTC = 오전 9시 KST / 오전 7시 베트남
+  workflow_dispatch:      # 수동 실행도 가능
 
 jobs:
   sync:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-level: '3.10'
+          python-version: '3.10'
           cache: 'pip'
 
       - name: Install Dependencies
@@ -24,8 +24,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install yfinance requests firebase-admin
 
-      - name: Run Price Sync Script
+      - name: Run Price Sync + AI Analysis Script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python scripts/sync_prices.py
