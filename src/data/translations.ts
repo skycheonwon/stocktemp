@@ -65,7 +65,7 @@ export const TRANSLATIONS = {
     quarterlyRevenueEps: '분기 매출 및 EPS 추이',
     quarterlyBps: '분기 BPS 추이',
     consensusVsFair: '목표가 vs 적정가 비교',
-    latestNews: '최신 뉴스',
+    latestNews: 'AI 투자 핵심 분석',
     analystTarget: '증권사 목표주가',
 
     // Watchlist
@@ -75,17 +75,17 @@ export const TRANSLATIONS = {
     emptyWatchlistDesc: '대시보드에서 분석하고자 하는 종목을 검색하고 별표를 눌러 관심 종목에 추가해 보세요.',
     goToSearch: '주식 검색하러 가기',
 
-    // Temperature details
-    tempFreezingLabel: '혹한기 (극심한 저평가)',
-    tempFreezingDesc: '얼어붙었지만 대세 상승의 씨앗이 되는 기회입니다.',
-    tempCoolLabel: '쌀쌀함 (매력적 저평가)',
-    tempCoolDesc: '쇼핑하기 딱 좋은 날씨입니다. 담아볼까요?',
-    tempNormalLabel: '쾌적함 (적정가)',
-    tempNormalDesc: '가치와 가격이 일치합니다. 편안하게 보유하세요.',
-    tempWarmLabel: '폭염 (고평가/과열)',
-    tempWarmDesc: '열기가 가득합니다. 신규 매수는 자제하세요.',
-    tempHotLabel: '용광로 (극단적 고평가)',
-    tempHotDesc: '너무 뜨겁습니다! 익절하고 대피하세요.',
+       // Temperature details
+    tempFreezingLabel: '극심한 저평가 (혹한기 - 찬스)',
+    tempFreezingDesc: '역사적 저평가 영역으로, 과매도에 따른 중장기적 반등 잠재력이 높은 구간입니다.',
+    tempCoolLabel: '매력적 저평가 (쌀쌀함 - 기회)',
+    tempCoolDesc: '내재 가치 대비 매력적인 가격대로 판단되며, 점진적인 관심이 유효한 구간입니다.',
+    tempNormalLabel: '적정가 (쾌적함 - 안정)',
+    tempNormalDesc: '현재 주가가 기업의 내재 가치 영역에 부합하며, 안정적인 가격 흐름을 보이고 있습니다.',
+    tempWarmLabel: '고평가 (과열) (폭염 - 주의)',
+    tempWarmDesc: '단기적 과열 상태로 판단되며, 신규 진입 시 가격 변동성에 유의해야 합니다.',
+    tempHotLabel: '극단적 고평가 (용광로 - 위험)',
+    tempHotDesc: '시장 가치 대비 극단적인 고평가 영역으로, 신중한 리스크 관리가 필요합니다.',
   },
   EN: {
     // Navigation
@@ -151,7 +151,7 @@ export const TRANSLATIONS = {
     quarterlyRevenueEps: 'Quarterly Revenue & EPS',
     quarterlyBps: 'Quarterly BPS Trend',
     consensusVsFair: 'Target vs Fair Price',
-    latestNews: 'Latest News',
+    latestNews: 'AI Investment Analysis',
     analystTarget: 'Analyst Target Price',
 
     // Watchlist
@@ -163,15 +163,15 @@ export const TRANSLATIONS = {
 
     // Temperature details
     tempFreezingLabel: 'Deep Freeze (Extreme Undervaluation)',
-    tempFreezingDesc: 'Frozen, but it\'s an opportunity that seeds a big rally.',
+    tempFreezingDesc: 'An extremely undervalued zone with high potential for a medium-to-long-term rebound due to oversold conditions.',
     tempCoolLabel: 'Chilly (Attractive Undervaluation)',
-    tempCoolDesc: 'Perfect weather for shopping. Shall we add some?',
+    tempCoolDesc: 'Judged to be attractively priced relative to intrinsic value, representing a valid range for gradual interest.',
     tempNormalLabel: 'Pleasant (Fair Value)',
-    tempNormalDesc: 'Value and price match. Hold comfortably.',
+    tempNormalDesc: 'The current price aligns with the company\'s intrinsic value, showing a stable price trend.',
     tempWarmLabel: 'Heatwave (Overvalued/Overheated)',
-    tempWarmDesc: 'Full of heat. Refrain from new purchases.',
+    tempWarmDesc: 'Judged to be in a short-term overheated state; caution is advised regarding price volatility when entering new positions.',
     tempHotLabel: 'Furnace (Extreme Overvaluation)',
-    tempHotDesc: 'Too hot! Take profit and evacuate.',
+    tempHotDesc: 'An extremely overvalued zone relative to market value, requiring cautious risk management.',
   },
   VI: {
     // Navigation
@@ -192,7 +192,7 @@ export const TRANSLATIONS = {
     vnindex: 'VN-INDEX 🇻🇳',
     hnx: 'HNX Index 🇻🇳',
     nikkei: 'Nikkei 225 🇯🇵',
-    searchPlaceholder: 'Tìm kiếm theo mã cổ phiếu, tên tiếng Anh hoặc tiếng Hàn...',
+    searchPlaceholder: 'Tìm kiếm theo mã cổ phiếu, tên tiếng Anh hoặc tên tiếng Hàn...',
     searchResults: 'Kết quả tìm kiếm',
     searchEmpty: 'Không tìm thấy cổ phiếu nào. Vui lòng kiểm tra lại chính tả.',
     coldestStocks: 'Cổ phiếu định giá thấp',
@@ -237,7 +237,7 @@ export const TRANSLATIONS = {
     quarterlyRevenueEps: 'Xu hướng Doanh thu & EPS quý',
     quarterlyBps: 'Xu hướng BPS quý',
     consensusVsFair: 'So sánh Giá mục tiêu & Hợp lý',
-    latestNews: 'Tin tức mới nhất',
+    latestNews: 'AI Phân tích Đầu tư',
     analystTarget: 'Giá mục tiêu của CTCK',
 
     // Watchlist
@@ -249,15 +249,15 @@ export const TRANSLATIONS = {
 
     // Temperature details
     tempFreezingLabel: 'Đông lạnh (Định giá cực thấp)',
-    tempFreezingDesc: 'Đóng băng nhưng là cơ hội gieo mầm cho sự phục hồi.',
+    tempFreezingDesc: 'Vùng định giá cực thấp với tiềm năng phục hồi trung và dài hạn cao do tình trạng quá bán.',
     tempCoolLabel: 'Se lạnh (Định giá hấp dẫn)',
-    tempCoolDesc: 'Thời tiết hoàn hảo để mua sắm. Thêm vào giỏ chứ?',
+    tempCoolDesc: 'Được đánh giá là có mức giá hấp dẫn so với giá trị nội tại, phù hợp để tích lũy dần.',
     tempNormalLabel: 'Dễ chịu (Giá hợp lý)',
-    tempNormalDesc: 'Giá trị và giá cả khớp nhau. Tự tin nắm giữ.',
+    tempNormalDesc: 'Mức giá hiện tại phù hợp với giá trị nội tại của doanh nghiệp, thể hiện xu hướng giá ổn định.',
     tempWarmLabel: 'Nắng nóng (Định giá cao/Quá nhiệt)',
-    tempWarmDesc: 'Không khí nóng bức. Hạn chế mua mới.',
+    tempWarmDesc: 'Được đánh giá là tình trạng quá nhiệt trong ngắn hạn, cần lưu ý biến động giá khi tham gia vị thế mới.',
     tempHotLabel: 'Lò lửa (Định giá cực cao)',
-    tempHotDesc: 'Quá nóng! Chốt lời và thoát ra.',
+    tempHotDesc: 'Vùng định giá cực cao so với giá trị thị trường, yêu cầu quản trị rủi ro thận trọng.',
   },
 }
 export type TranslationKey = keyof typeof TRANSLATIONS.KO;
