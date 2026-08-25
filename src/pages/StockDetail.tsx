@@ -276,8 +276,8 @@ export default function StockDetail() {
             <div className="grid grid-cols-3 gap-2.5 border-t border-slate-800/50 pt-5">
               {/* 1. Target P/E Multiple (AI Target) */}
               <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">
-                  {language === 'KO' ? '적정 P/E (AI 선정)' : language === 'VI' ? 'P/E hợp lý (AI chọn)' : 'Fair P/E (AI Selected)'}
+                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
+                  {language === 'KO' ? '적정 P/E (AI)' : language === 'VI' ? 'P/E hợp lý (AI)' : 'Fair P/E (AI)'}
                 </span>
                 <span className="block font-black text-blue-400 font-mono text-sm sm:text-base mt-0.5">
                   {targetPe}x
@@ -286,8 +286,8 @@ export default function StockDetail() {
 
               {/* 2. Current P/E Ratio */}
               <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">
-                  {t('pe')}
+                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
+                  {language === 'KO' ? '현재 P/E' : language === 'VI' ? 'P/E hiện tại' : 'Current P/E'}
                 </span>
                 <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
                   {(currentPrice / currentEps).toFixed(1)}x
@@ -296,8 +296,8 @@ export default function StockDetail() {
 
               {/* 3. Earnings Per Share (EPS) */}
               <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">
-                  {t('eps')}
+                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
+                  {language === 'KO' ? '현재 EPS' : language === 'VI' ? 'EPS hiện tại' : 'Current EPS'}
                 </span>
                 <span className="block font-black text-slate-200 font-mono text-[11px] sm:text-xs md:text-sm mt-0.5 truncate">
                   {stock.currency} {Math.round(currentEps).toLocaleString()}
