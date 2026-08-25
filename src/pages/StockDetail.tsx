@@ -1173,8 +1173,67 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
   const isUpside = fairPrice > currentPrice
   const upsidePct = Math.abs(((fairPrice - currentPrice) / currentPrice) * 100).toFixed(1)
 
+  // SVG parameters for the S-curve
+  const svgWidth = 500
+  const svgHeight = 155
+  const paddingX = 40
+  const chartWidth = svgWidth - paddingX * 2
+
+  const getCoords = (pct: number) => {
+    const t = pct / 100
+    const x = paddingX + t * chartWidth
+    // S-curve cosine mapping (left t=0 is lower Y=80, right t=1 is higher Y=30)
+    const y = 55 + 25 * Math.cos(Math.PI * t)
+    return { x, y }
+  }
+
+  const pCp = getCoords(cpPct)
+  const pFp = getCoords(fpPct)
+  const pCt = getCoords(ctPct)
+
+  // Generate smooth curve path
+  let curvePath = `M ${paddingX},80`
+  for (let i = 1; i <= 100; i++) {
+    const t = i / 100
+    const x = paddingX + t * chartWidth
+    const y = 55 + 25 * Math.cos(Math.PI * t)
+    curvePath += ` L ${x},${y}`
+  }
+
+  // Define components for the 3 metrics
+  const items = [
+    { label: t('currentPrice'), val: currentPrice, color: '#f1f5f9', x: pCp.x, y: pCp.y, glow: false },
+    { label: t('fairPrice'), val: fairPrice, color: '#60a5fa', x: pFp.x, y: pFp.y, glow: true },
+    { label: t('analystTarget'), val: consensusTarget, color: '#fbbf24', x: pCt.x, y: pCt.y, glow: false }
+  ]
+
+  // Sort items horizontally to calculate overlap staggering
+  const sortedItems = [...items].sort((a, b) => a.x - b.x)
+
+  // Staggering: if adjacent labels are closer than 65px horizontally, alternate heights
+  let levels = [0, 0, 0] // 0 = high level, 1 = low level
+  for (let i = 1; i < sortedItems.length; i++) {
+    if (sortedItems[i].x - sortedItems[i-1].x < 70) {
+      levels[i] = levels[i-1] === 0 ? 1 : 0
+    } else {
+      levels[i] = 0
+    }
+  }
+
+  const renderedItems = sortedItems.map((item, idx) => {
+    const isLowLevel = levels[idx] === 1
+    const yLineEnd = isLowLevel ? 122 : 98
+    const yTextName = isLowLevel ? 131 : 107
+    const yTextVal = isLowLevel ? 143 : 119
+    
+    // Clamp horizontal position so label pill doesn't clip boundaries (keep center X between 50 and 450)
+    const clampedX = Math.max(50, Math.min(450, item.x))
+    
+    return { ...item, yLineEnd, yTextName, yTextVal, clampedX }
+  })
+
   return (
-    <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-4 space-y-5">
+    <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-4 space-y-3">
       <div className="flex justify-between items-center text-xs">
         <span className="font-bold text-slate-300">{t('consensusVsFair')}</span>
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1188,50 +1247,123 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
         </span>
       </div>
 
-      <div className="space-y-6 py-2">
-        <div className="relative h-2 bg-slate-900 rounded-full border border-slate-850">
-          {/* Current Price Marker */}
-          <div 
-            className="absolute -top-1.5 w-5 h-5 rounded-full bg-slate-100 border-4 border-slate-950 shadow-md flex items-center justify-center -translate-x-1/2 z-10 transition-all duration-500"
-            style={{ left: `${cpPct}%` }}
-            title={`${t('currentPrice')}: ${currentPrice.toLocaleString()}`}
-          >
-            <div className="w-1.5 h-1.5 bg-slate-800 rounded-full" />
-          </div>
-          
-          {/* Fair Price Marker */}
-          <div 
-            className="absolute -top-1.5 w-5 h-5 rounded-full bg-blue-500 border-4 border-slate-950 shadow-md flex items-center justify-center -translate-x-1/2 z-10 transition-all duration-500"
-            style={{ left: `${fpPct}%` }}
-            title={`${t('fairPrice')}: ${fairPrice.toLocaleString()}`}
-          >
-            <div className="w-1.5 h-1.5 bg-white rounded-full animate-ping" />
-          </div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto select-none">
+          <defs>
+            <linearGradient id="curveGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+              <stop offset="50%" stopColor="#10b981" stopOpacity="0.7" />
+              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.4" />
+            </linearGradient>
+          </defs>
 
-          {/* Consensus Target Marker */}
-          <div 
-            className="absolute -top-1.5 w-5 h-5 rounded-full bg-amber-500 border-4 border-slate-950 shadow-md flex items-center justify-center -translate-x-1/2 z-10 transition-all duration-500"
-            style={{ left: `${ctPct}%` }}
-            title={`${t('analystTarget')}: ${consensusTarget.toLocaleString()}`}
-          >
-            <div className="w-1.5 h-1.5 bg-slate-950 rounded-full" />
-          </div>
-        </div>
+          {/* S-curve background line for visual depth */}
+          <path
+            d={curvePath}
+            fill="none"
+            stroke="#090d16"
+            strokeWidth="8"
+            strokeLinecap="round"
+          />
 
-        <div className="grid grid-cols-3 gap-2 text-[10px] pt-1">
-          <div className="text-left space-y-0.5">
-            <span className="block text-slate-500 font-bold uppercase tracking-wider">{t('currentPrice')}</span>
-            <span className="block font-semibold text-slate-300 font-mono">{currency} {currentPrice.toLocaleString()}</span>
-          </div>
-          <div className="text-center space-y-0.5">
-            <span className="block text-blue-400 font-bold uppercase tracking-wider">{t('fairPrice')}</span>
-            <span className="block font-black text-blue-400 font-mono">{currency} {Math.round(fairPrice).toLocaleString()}</span>
-          </div>
-          <div className="text-right space-y-0.5">
-            <span className="block text-amber-400 font-bold uppercase tracking-wider">{t('analystTarget')}</span>
-            <span className="block font-semibold text-amber-400 font-mono">{currency} {consensusTarget.toLocaleString()}</span>
-          </div>
-        </div>
+          {/* Colored active S-curve path */}
+          <path
+            d={curvePath}
+            fill="none"
+            stroke="url(#curveGrad)"
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+
+          {/* Dashed guidelines for each dot down to the label levels */}
+          {renderedItems.map((item, idx) => (
+            <line
+              key={idx}
+              x1={item.x}
+              y1={item.y + 6}
+              x2={item.x}
+              y2={item.yLineEnd - 12}
+              stroke={item.color}
+              strokeWidth="1.2"
+              strokeDasharray="2,2"
+              opacity="0.4"
+            />
+          ))}
+
+          {/* Render Dot Markers */}
+          {items.map((item, idx) => (
+            <g key={idx}>
+              {item.glow && (
+                <circle
+                  cx={item.x}
+                  cy={item.y}
+                  r="8"
+                  fill="#60a5fa"
+                  opacity="0.35"
+                  className="animate-ping"
+                />
+              )}
+              <circle
+                cx={item.x}
+                cy={item.y}
+                r="5.5"
+                fill={item.color}
+                stroke="#020617"
+                strokeWidth="2.5"
+              />
+            </g>
+          ))}
+
+          {/* Render Staggered Labels with clamping to prevent boundary clipping */}
+          {renderedItems.map((item, idx) => (
+            <g key={idx}>
+              {/* Semi-transparent label background to ensure readability */}
+              <rect
+                x={item.clampedX - 52}
+                y={item.yTextName - 9}
+                width="104"
+                height="24"
+                rx="5"
+                fill="#020617"
+                fillOpacity="0.75"
+              />
+              
+              {/* Guide circle at label line end */}
+              <circle
+                cx={item.x}
+                cy={item.yLineEnd - 12}
+                r="2"
+                fill={item.color}
+                opacity="0.7"
+              />
+
+              {/* Metric Title Label */}
+              <text
+                x={item.clampedX}
+                y={item.yTextName}
+                fill={item.color}
+                fontSize="8.5"
+                fontWeight="black"
+                textAnchor="middle"
+                className="tracking-wider uppercase font-sans"
+              >
+                {item.label}
+              </text>
+              {/* Metric Value */}
+              <text
+                x={item.clampedX}
+                y={item.yTextVal}
+                fill="#f1f5f9"
+                fontSize="9.5"
+                fontWeight="bold"
+                textAnchor="middle"
+                className="font-mono"
+              >
+                {currency} {Math.round(item.val).toLocaleString()}
+              </text>
+            </g>
+          ))}
+        </svg>
       </div>
     </div>
   )
