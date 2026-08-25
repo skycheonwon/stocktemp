@@ -188,31 +188,31 @@ export default function StockDetail() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
           <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('currentPrice')}</span>
-          <span className="block text-2xl md:text-3xl font-black text-slate-200 mt-1.5 font-mono">
+          <span className="block text-xl md:text-2xl font-black text-slate-200 mt-1.5 font-mono">
             {stock.currency} {currentPrice.toLocaleString()}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
           <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('fairPrice')}</span>
-          <span className="block text-2xl md:text-3xl font-black text-blue-400 mt-1.5 font-mono">
+          <span className="block text-xl md:text-2xl font-black text-blue-400 mt-1.5 font-mono">
             {stock.currency} {Math.round(fairPrice).toLocaleString()}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
           <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('baseInterestRate')}</span>
-          <span className="block text-2xl md:text-3xl font-black text-amber-500 mt-1.5 font-mono">
+          <span className="block text-xl md:text-2xl font-black text-amber-500 mt-1.5 font-mono">
             {baseRate}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
           <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('expectedReturn')}</span>
-          <span className={`block text-2xl md:text-3xl font-black mt-1.5 font-mono flex items-center gap-1.5 ${
+          <span className={`block text-xl md:text-2xl font-black mt-1.5 font-mono flex items-center gap-1.5 ${
             expectedReturn > 10 ? 'text-emerald-400' : 'text-slate-300'
           }`}>
-            <TrendingUp className="w-6 h-6 shrink-0" />
+            <TrendingUp className="w-5 h-5 shrink-0" />
             {expectedReturn}%
           </span>
         </div>
@@ -228,7 +228,7 @@ export default function StockDetail() {
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-                  {language === 'KO' ? 'AI 가치 평가 요약' : language === 'VI' ? 'Tóm tắt định giá AI' : 'AI Valuation Summary'}
+                  {language === 'KO' ? 'StockTemp 가치 평가 요약' : language === 'VI' ? 'Tóm tắt định giá StockTemp' : 'StockTemp Valuation Summary'}
                 </h3>
               </div>
 
@@ -275,31 +275,31 @@ export default function StockDetail() {
             {/* Core Metrics Grid */}
             <div className="grid grid-cols-3 gap-2.5 border-t border-slate-800/50 pt-5">
               {/* 1. Target P/E Multiple (AI Target) */}
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-xs font-bold uppercase tracking-wider truncate">
-                  {language === 'KO' ? '목표 P/E' : language === 'VI' ? 'P/E mục tiêu' : 'Target P/E'}
+              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">
+                  {language === 'KO' ? '적정 P/E (AI 선정)' : language === 'VI' ? 'P/E hợp lý (AI chọn)' : 'Fair P/E (AI Selected)'}
                 </span>
-                <span className="block font-black text-blue-400 font-mono text-base md:text-lg mt-0.5">
+                <span className="block font-black text-blue-400 font-mono text-sm sm:text-base mt-0.5">
                   {targetPe}x
                 </span>
               </div>
 
               {/* 2. Current P/E Ratio */}
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-xs font-bold uppercase tracking-wider truncate">
+              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">
                   {t('pe')}
                 </span>
-                <span className="block font-black text-slate-200 font-mono text-base md:text-lg mt-0.5">
+                <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
                   {(currentPrice / currentEps).toFixed(1)}x
                 </span>
               </div>
 
               {/* 3. Earnings Per Share (EPS) */}
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-xs font-bold uppercase tracking-wider truncate">
+              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider truncate">
                   {t('eps')}
                 </span>
-                <span className="block font-black text-slate-200 font-mono text-sm sm:text-base md:text-lg mt-0.5 truncate">
+                <span className="block font-black text-slate-200 font-mono text-[11px] sm:text-xs md:text-sm mt-0.5 truncate">
                   {stock.currency} {Math.round(currentEps).toLocaleString()}
                 </span>
               </div>
