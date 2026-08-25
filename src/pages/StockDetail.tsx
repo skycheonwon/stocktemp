@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Star, TrendingUp, Brain } from 'lucide-react'
+import { ArrowLeft, Star, TrendingUp, Zap } from 'lucide-react'
 import { COUNTRY_NAMES } from '../data/mockStocks'
 import { useLanguage } from '../context/LanguageContext'
 import { useLivePrices } from '../context/LivePriceContext'
@@ -320,8 +320,8 @@ export default function StockDetail() {
 
       {/* Bottom: Latest News Section (Max 3 articles) */}
       <div className="border-t border-slate-800/60 pt-8 space-y-4">
-        <h3 className="text-sm font-bold text-slate-400 flex items-center gap-2">
-          <Brain className="w-4 h-4 text-blue-400" /> {t('latestNews')}
+        <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
+          <Zap className="w-5 h-5 text-yellow-400 fill-yellow-400/20" /> {t('latestNews')}
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
