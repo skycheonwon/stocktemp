@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Star, TrendingUp, TrendingDown, RefreshCw, Activity } from 'lucide-react'
+import { ArrowLeft, Star, TrendingUp, Brain } from 'lucide-react'
 import { COUNTRY_NAMES } from '../data/mockStocks'
 import { useLanguage } from '../context/LanguageContext'
 import { useLivePrices } from '../context/LivePriceContext'
 import {
   calculateFairPrice,
   calculateExpectedReturn,
+  calculateStockTemperature,
 } from '../utils/valuation'
+import { WeatherIcon } from '../components/WeatherIcon'
 
 export default function StockDetail() {
   const { id } = useParams<{ id: string }>()
@@ -16,27 +18,8 @@ export default function StockDetail() {
   const { t, language } = useLanguage()
 
   // State
-  const [targetPe, setTargetPe] = useState<number>(15)
-  const [currentPrice, setCurrentPrice] = useState<number>(0)
   const [isSaved, setIsSaved] = useState<boolean>(false)
-  const [livePriceFeed, setLivePriceFeed] = useState<boolean>(false)
-
-  // Sync state when stock and live price loads
-  useEffect(() => {
-    if (stock) {
-      setTargetPe((prev) => (prev === 15 ? stock.defaultTargetPe : prev))
-      const livePrice = prices[stock.id] || stock.currentPrice
-      setCurrentPrice((prev) => (prev === 0 ? livePrice : prev))
-    }
-  }, [stock, prices])
-
-  // Also sync currentPrice dynamically if livePrice updates from Firestore
-  const livePrice = stock ? (prices[stock.id] || stock.currentPrice) : 0
-  useEffect(() => {
-    if (stock) {
-      setCurrentPrice(livePrice)
-    }
-  }, [livePrice, stock])
+  const [expandedNewsIndex, setExpandedNewsIndex] = useState<number | null>(null)
 
   // Watchlist LocalStorage sync
   useEffect(() => {
@@ -47,22 +30,6 @@ export default function StockDetail() {
       setIsSaved(watchlist.includes(stock.id))
     }
   }, [stock])
-
-  // Simulate price changes for proto
-  useEffect(() => {
-    if (!livePriceFeed || !stock) return
-
-    const interval = setInterval(() => {
-      // Simulate small random fluctuations (+-0.2%)
-      setCurrentPrice((prev) => {
-        const changePercent = (Math.random() * 0.4 - 0.2) / 100
-        const newPrice = prev * (1 + changePercent)
-        return Number(newPrice.toFixed(stock.country === 'US' ? 2 : 0))
-      })
-    }, 3000)
-
-    return () => clearInterval(interval)
-  }, [livePriceFeed, stock])
 
   if (loading && !stock) {
     return (
@@ -98,16 +65,85 @@ export default function StockDetail() {
     localStorage.setItem('stocktemp_watchlist', JSON.stringify(watchlist))
   }
 
+  const currentPrice = prices[stock.id] || stock.currentPrice
+  const targetPe = stock.defaultTargetPe
   const currentEps = eps[stock.id] || stock.eps
 
-  // Recalculate metrics based on slider targetPe & currentPrice state
+  // Recalculate metrics based on targetPe & currentPrice state
   const fairPrice = calculateFairPrice(currentEps, targetPe)
   const expectedReturn = calculateExpectedReturn(currentPrice / currentEps)
+  const stockTemp = calculateStockTemperature(currentPrice, fairPrice)
+
+  const getLocalizedTempDetails = (temp: number, t: any) => {
+    if (temp <= -2.5) {
+      return {
+        label: t('tempFreezingLabel'),
+        description: t('tempFreezingDesc'),
+        colorClass: 'text-blue-400',
+        badgeColorClass: 'bg-blue-950/80 text-blue-300 border-blue-900/50',
+        emoji: '❄️',
+        iconName: 'snowflake' as const,
+        tempVal: `${temp}°C`,
+      }
+    } else if (temp < 12.5) {
+      return {
+        label: t('tempCoolLabel'),
+        description: t('tempCoolDesc'),
+        colorClass: 'text-cyan-400',
+        badgeColorClass: 'bg-cyan-950/80 text-cyan-300 border-cyan-900/50',
+        emoji: '🔵',
+        iconName: 'wind' as const,
+        tempVal: `${temp}°C`,
+      }
+    } else if (temp <= 27.5) {
+      return {
+        label: t('tempNormalLabel'),
+        description: t('tempNormalDesc'),
+        colorClass: 'text-emerald-400',
+        badgeColorClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-900/50',
+        emoji: '🟢',
+        iconName: 'cloud-sun' as const,
+        tempVal: `${temp}°C`,
+      }
+    } else if (temp <= 42.5) {
+      return {
+        label: t('tempWarmLabel'),
+        description: t('tempWarmDesc'),
+        colorClass: 'text-amber-400',
+        badgeColorClass: 'bg-amber-950/80 text-amber-300 border-amber-900/50',
+        emoji: '🟠',
+        iconName: 'sun' as const,
+        tempVal: `${temp}°C`,
+      }
+    } else {
+      return {
+        label: t('tempHotLabel'),
+        description: t('tempHotDesc'),
+        colorClass: 'text-rose-500',
+        badgeColorClass: 'bg-rose-950/80 text-rose-300 border-rose-900/50',
+        emoji: '🔴',
+        iconName: 'flame' as const,
+        tempVal: `${temp}°C`,
+      }
+    }
+  }
+
+  const tempDetails = getLocalizedTempDetails(stockTemp, t)
 
   const displayName = language === 'KO' ? (stock.koreanName || stock.name) : stock.name
-
-  const mockNews = getMockNews(displayName, language)
   const baseRate = getBaseInterestRate(stock.country)
+
+  // Load real-world synced news or fallback to mock news
+  let newsList: any[] = []
+  if (language === 'KO' && stock.latestNews_KO && stock.latestNews_KO.length > 0) {
+    newsList = stock.latestNews_KO
+  } else if (language === 'VI' && stock.latestNews_VI && stock.latestNews_VI.length > 0) {
+    newsList = stock.latestNews_VI
+  } else if (stock.latestNews_EN && stock.latestNews_EN.length > 0) {
+    newsList = stock.latestNews_EN
+  } else {
+    newsList = getMockNews(stock, displayName, language)
+  }
 
   return (
     <div className="space-y-8 pb-12">
@@ -151,141 +187,122 @@ export default function StockDetail() {
       {/* Top Metrics Grid (4-Card) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">{t('currentPrice')}</span>
-          <span className="block text-xl font-black text-slate-200 mt-1.5 font-mono">
+          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('currentPrice')}</span>
+          <span className="block text-2xl md:text-3xl font-black text-slate-200 mt-1.5 font-mono">
             {stock.currency} {currentPrice.toLocaleString()}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">{t('fairPrice')}</span>
-          <span className="block text-xl font-black text-blue-400 mt-1.5 font-mono">
+          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('fairPrice')}</span>
+          <span className="block text-2xl md:text-3xl font-black text-blue-400 mt-1.5 font-mono">
             {stock.currency} {Math.round(fairPrice).toLocaleString()}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">{t('baseInterestRate')}</span>
-          <span className="block text-xl font-black text-amber-500 mt-1.5 font-mono">
+          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('baseInterestRate')}</span>
+          <span className="block text-2xl md:text-3xl font-black text-amber-500 mt-1.5 font-mono">
             {baseRate}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider">{t('expectedReturn')}</span>
-          <span className={`block text-xl font-black mt-1.5 font-mono flex items-center gap-1.5 ${
+          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('expectedReturn')}</span>
+          <span className={`block text-2xl md:text-3xl font-black mt-1.5 font-mono flex items-center gap-1.5 ${
             expectedReturn > 10 ? 'text-emerald-400' : 'text-slate-300'
           }`}>
-            <TrendingUp className="w-5 h-5" />
+            <TrendingUp className="w-6 h-6 shrink-0" />
             {expectedReturn}%
           </span>
         </div>
       </div>
 
       {/* Middle Layout: Interactive Valuation Slider & SVG Charts Dashboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
         
-        {/* Left Column: Interactive Valuation Controller (Lg: 4/12) */}
+        {/* Left Column: AI Valuation & Stock Temperature Summary Card (Lg: 4/12) */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('valuationCalc')}</h3>
-              
-              {/* Live Price Switch */}
-              <button
-                onClick={() => setLivePriceFeed(!livePriceFeed)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[10px] font-semibold transition-all ${
-                  livePriceFeed
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                    : 'bg-slate-950 border-slate-800 text-slate-500'
-                }`}
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${livePriceFeed ? 'animate-spin' : ''}`} />
-                {t('livePriceFeed')} {livePriceFeed ? 'ON' : 'OFF'}
-              </button>
-            </div>
+          <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 shadow-2xl flex flex-col justify-between h-full">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+                  {language === 'KO' ? 'AI 가치 평가 요약' : language === 'VI' ? 'Tóm tắt định giá AI' : 'AI Valuation Summary'}
+                </h3>
+              </div>
 
-            {/* Target P/E Multiple Slider */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-medium">{t('targetPeSlider')}</span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-slate-500 font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded-lg flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-indigo-400 animate-pulse" />
-                    {language === 'KO' ? `AI 추천: ${stock.defaultTargetPe}배` : language === 'VI' ? `AI gợi ý: ${stock.defaultTargetPe}x` : `AI Rec: ${stock.defaultTargetPe}x`}
-                  </span>
-                  <span className="font-bold text-blue-400 text-sm font-mono">{targetPe} {t('times')}</span>
+              {/* Grid layout for left text summary and right vertical gauge */}
+              <div className="grid grid-cols-12 gap-4 items-stretch">
+                {/* Left side (8/12 column): Temp Banner and Action Guide with reduced width */}
+                <div className="col-span-8 flex flex-col justify-between gap-4">
+                  {/* Stock Temperature Banner with WeatherIcon only */}
+                  <div className="flex items-center gap-4 bg-slate-950/50 border border-slate-800/60 rounded-2xl p-4 flex-1">
+                    <div className="bg-slate-900 border border-slate-850 p-2.5 rounded-xl shadow-inner shrink-0">
+                      <WeatherIcon name={tempDetails.iconName} className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
+                        {t('currentStockTemp')}
+                      </span>
+                      <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-0.5">
+                        <span className={`text-lg font-black font-mono leading-none ${tempDetails.colorClass}`}>
+                          {tempDetails.tempVal}
+                        </span>
+                        <span className={`text-[10px] font-bold ${tempDetails.colorClass}`}>
+                          {tempDetails.emoji} {tempDetails.label}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Recommendation Message (Same width) */}
+                  <div className="bg-slate-950/30 border border-slate-850 p-4 rounded-xl text-xs text-slate-300 leading-relaxed">
+                    <span className="font-bold text-slate-400 block mb-1 text-[10px] uppercase tracking-wider">
+                      {language === 'KO' ? '행동 가이드' : language === 'VI' ? 'Hướng dẫn hành động' : 'Action Guide'}
+                    </span>
+                    {tempDetails.description}
+                  </div>
+                </div>
+
+                {/* Right side (4/12 column): Vertical Temperature Gauge (Wider, Bolder & Stretched) */}
+                <div className="col-span-4 bg-slate-950/50 border border-slate-800/60 rounded-2xl p-1.5 flex flex-col items-center justify-center min-h-[185px]">
+                  {renderVerticalTempGauge(stockTemp)}
                 </div>
               </div>
-              <input
-                type="range"
-                min="5"
-                max="45"
-                step="1"
-                value={targetPe}
-                onChange={(e) => setTargetPe(Number(e.target.value))}
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none"
-              />
-              <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                <span>{t('conservative')}</span>
-                <span>{t('fair')}</span>
-                <span>{t('aggressive')}</span>
-              </div>
             </div>
 
-            {/* Additional stock properties (PE & EPS) */}
-            <div className="grid grid-cols-2 gap-4 border-t border-slate-800/50 pt-4 text-xs">
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850">
-                <span className="block text-slate-500 text-[10px] font-bold uppercase">{t('eps')}</span>
-                <span className="font-bold text-slate-300 mt-1 block font-mono">
-                  {stock.currency} {currentEps.toLocaleString()}
+            {/* Core Metrics Grid */}
+            <div className="grid grid-cols-3 gap-2.5 border-t border-slate-800/50 pt-5">
+              {/* 1. Target P/E Multiple (AI Target) */}
+              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-550 text-xs font-bold uppercase tracking-wider truncate">
+                  {language === 'KO' ? '목표 P/E' : language === 'VI' ? 'P/E mục tiêu' : 'Target P/E'}
+                </span>
+                <span className="block font-black text-blue-400 font-mono text-base md:text-lg mt-0.5">
+                  {targetPe}x
                 </span>
               </div>
-              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850">
-                <span className="block text-slate-500 text-[10px] font-bold uppercase">{t('pe')}</span>
-                <span className="font-bold text-slate-300 mt-1 block font-mono">
-                  {(currentPrice / currentEps).toFixed(2)} {t('times')}
+
+              {/* 2. Current P/E Ratio */}
+              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-550 text-xs font-bold uppercase tracking-wider truncate">
+                  {t('pe')}
+                </span>
+                <span className="block font-black text-slate-200 font-mono text-base md:text-lg mt-0.5">
+                  {(currentPrice / currentEps).toFixed(1)}x
                 </span>
               </div>
-            </div>
 
-            {/* Price Simulator Controls */}
-            <div className="space-y-3 border-t border-slate-800/50 pt-4">
-              <span className="text-xs text-slate-400 font-medium block">{t('priceSimulator')}</span>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setCurrentPrice((prev) => Math.max(1, prev * 0.95))}
-                  className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-850 rounded-xl text-xs font-semibold text-cyan-400 transition-colors"
-                >
-                  <TrendingDown className="w-4 h-4" /> {t('currentPrice')} -5%
-                </button>
-                <button
-                  onClick={() => setCurrentPrice((prev) => prev * 1.05)}
-                  className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-950 hover:bg-slate-900 border border-slate-850 rounded-xl text-xs font-semibold text-rose-400 transition-colors"
-                >
-                  <TrendingUp className="w-4 h-4" /> {t('currentPrice')} +5%
-                </button>
+              {/* 3. Earnings Per Share (EPS) */}
+              <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-550 text-xs font-bold uppercase tracking-wider truncate">
+                  {t('eps')}
+                </span>
+                <span className="block font-black text-slate-200 font-mono text-sm sm:text-base md:text-lg mt-0.5 truncate">
+                  {stock.currency} {Math.round(currentEps).toLocaleString()}
+                </span>
               </div>
-            </div>
-
-            {/* AI Analysis Details */}
-            <div className="bg-slate-950/40 p-4 rounded-2xl border border-slate-850 text-[10px] text-slate-400 leading-relaxed space-y-1.5">
-              <span className="font-bold text-indigo-400 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                {language === 'KO' ? 'AI 멀티플 분석 근거' : language === 'VI' ? 'Cơ sở phân tích AI' : 'AI Valuation Analysis'}
-              </span>
-              <p>
-                {(() => {
-                  const pe = stock.defaultTargetPe
-                  if (language === 'KO') {
-                    return `이 종목은 '${stock.industry}' 업종 특성, 이익 성장성(PEG), 국가별 기준 금리(${baseRate})를 종합 분석하여 AI가 적정 P/E를 ${pe}배로 자동 산정했습니다. 사용자는 분석 결과에 따라 즉시 적정 가치를 판단할 수 있으며, 필요 시 슬라이더로 조절 가능합니다.`
-                  }
-                  if (language === 'VI') {
-                    return `Cổ phiếu này được AI tự động phân tích và đưa ra số nhân P/E hợp lý là ${pe}x dựa trên đặc thù ngành '${stock.industry}', tiềm năng tăng trưởng (PEG) và lãi suất cơ bản quốc gia (${baseRate}). Bạn có thể tùy chỉnh nếu cần.`
-                  }
-                  return `This stock's fair P/E was automatically determined as ${pe}x by AI after analyzing '${stock.industry}' industry properties, growth potential (PEG), and base interest rate (${baseRate}). You can adjust it anytime.`
-                })()}
-              </p>
             </div>
           </div>
         </div>
@@ -304,27 +321,55 @@ export default function StockDetail() {
       {/* Bottom: Latest News Section (Max 3 articles) */}
       <div className="border-t border-slate-800/60 pt-8 space-y-4">
         <h3 className="text-sm font-bold text-slate-400 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-400" /> {t('latestNews')}
+          <Brain className="w-4 h-4 text-blue-400" /> {t('latestNews')}
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {mockNews.map((news, idx) => (
-            <a 
-              key={idx}
-              href={news.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-slate-900 border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-5 shadow-md hover:-translate-y-0.5 transition-all group"
-            >
-              <div className="flex justify-between items-start text-[10px] text-slate-500 font-bold mb-2">
-                <span>{news.publisher}</span>
-                <span className="font-mono">{news.pubDate}</span>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+          {newsList.map((news, idx) => {
+            const isExpanded = expandedNewsIndex === idx
+            return (
+              <div 
+                key={idx} 
+                className="bg-slate-900 border border-slate-800/80 rounded-2xl overflow-hidden transition-all duration-200 shadow-md flex flex-col"
+              >
+                {/* Header / Click Trigger */}
+                <button
+                  onClick={() => setExpandedNewsIndex(isExpanded ? null : idx)}
+                  className="w-full text-left p-5 flex flex-col justify-between hover:bg-slate-850/50 transition-colors h-full"
+                >
+                  <div className="flex justify-between items-start text-[10px] text-slate-500 font-bold mb-3 w-full">
+                    <span>{news.publisher}</span>
+                    <span className="truncate max-w-[100px]">{news.pubDate}</span>
+                  </div>
+                  <div className="flex justify-between items-end gap-2 w-full">
+                    <h4 className="text-xs font-bold text-slate-300 group-hover:text-blue-400 transition-colors leading-snug line-clamp-2 flex-1">
+                      {news.title}
+                    </h4>
+                    <span className={`text-[10px] text-slate-500 transition-transform duration-300 shrink-0 ${isExpanded ? 'rotate-180 text-blue-400' : ''}`}>
+                      ▼
+                    </span>
+                  </div>
+                </button>
+
+                {/* Accordion Expanded Content */}
+                <div 
+                  className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                    isExpanded ? 'max-h-[300px] border-t border-slate-850' : 'max-h-0'
+                  }`}
+                >
+                  <div className="p-5 bg-slate-950/20 text-xs text-slate-400 leading-relaxed whitespace-pre-line">
+                    {news.content || (
+                      language === 'KO' 
+                        ? `[금융분석요약] 본 뉴스는 '${news.title}'에 대한 보도입니다.\n\n최근 금융투자업계에서는 해당 기업의 이번 소식이 향후 영업 마진 및 밸류에이션(P/E)에 미칠 중장기 영향에 주목하고 있습니다. 전문가들은 단기 주가 흐름보다는 중장기 밸류에이션의 실질적인 변화를 꾸준히 모니터링할 것을 권장합니다.`
+                        : language === 'VI'
+                          ? `[Tóm tắt phân tích tài chính] Bản tin này phản ánh về '${news.title}'.\n\nGiới đầu tư đang đánh giá tác động của sự kiện này đối với triển vọng doanh thu và định giá. Khuyến nghị nhà đầu tư tiếp tục theo dõi báo cáo tài chính để kiểm chứng thực tế.`
+                          : `[Financial Analysis Summary] This news article reports on '${news.title}'.\n\nMarket participants are evaluating how this development will influence the revenue growth trajectory and valuation multiples. Investors are encouraged to monitor long-term earnings statements.`
+                    )}
+                  </div>
+                </div>
               </div>
-              <h4 className="text-xs font-bold text-slate-200 group-hover:text-blue-400 leading-relaxed transition-colors line-clamp-2">
-                {news.title}
-              </h4>
-            </a>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
@@ -333,9 +378,99 @@ export default function StockDetail() {
 
 
 
-/**
- * Helpers & Custom SVG Charting Components
- */
+const renderVerticalTempGauge = (temp: number) => {
+  // Clamp temp between -10 and 100
+  const clampedTemp = Math.max(-10, Math.min(100, temp));
+  
+  // Non-linear visual height mapping:
+  // Total viewBox height is 140.
+  // 100C is at Y = 5
+  // 0C baseline is at Y = 95
+  // -10C is at Y = 135
+  // Positive range (0 to 100) spans 90px
+  // Negative range (0 to -10) spans 40px
+  const y_0 = 95;
+  const y_minus_10 = 135;
+  let y_curr = y_0;
+  
+  if (clampedTemp >= 0) {
+    y_curr = y_0 - (clampedTemp / 100) * 90;
+  } else {
+    y_curr = y_0 + (Math.abs(clampedTemp) / 10) * 40;
+  }
+  
+  const isPositive = clampedTemp >= 0;
+  const pointerColor = isPositive ? '#ef4444' : '#3b82f6';
+
+  return (
+    <svg viewBox="0 0 100 140" className="w-full h-full max-h-[185px] select-none">
+      <defs>
+        {/* Gradation definitions */}
+        <linearGradient id="redGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="#ffedd5" />
+          <stop offset="30%" stopColor="#fdba74" />
+          <stop offset="65%" stopColor="#ef4444" />
+          <stop offset="100%" stopColor="#b91c1c" />
+        </linearGradient>
+        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#e0f2fe" />
+          <stop offset="35%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#1d4ed8" />
+        </linearGradient>
+        
+        {/* Clip path for the whole thermometer track */}
+        <clipPath id="trackClip">
+          <rect x="44" y="5" width="18" height="130" rx="9" />
+        </clipPath>
+      </defs>
+
+      {/* Background Track border/shadow outline */}
+      <rect x="44" y="5" width="18" height="130" rx="9" fill="#0f172a" stroke="#1e293b" strokeWidth="1.5" />
+      
+      {/* Seamless Gradient Fills inside Clip Path */}
+      <g clipPath="url(#trackClip)">
+        {/* Below 0C: Blue Gradient Bar (0 to -10) */}
+        <rect x="44" y="95" width="18" height="40" fill="url(#blueGrad)" />
+        {/* Above 0C: Red Gradient Bar (0 to 100) */}
+        <rect x="44" y="5" width="18" height="90" fill="url(#redGrad)" />
+      </g>
+      
+      {/* 0C Baseline marker inside track */}
+      <line x1="40" y1={y_0} x2="66" y2={y_0} stroke="#334155" strokeWidth="2" opacity="0.8" />
+      
+      {/* Current Temperature White Circle Indicator centered in the bar */}
+      <circle cx="53" cy={y_curr} r="5.5" fill="#ffffff" stroke={pointerColor} strokeWidth="2.5" />
+      
+      {/* Indicator Pointer & Value Label on the Left */}
+      <line x1="32" y1={y_curr} x2="44" y2={y_curr} stroke={pointerColor} strokeWidth="1.5" strokeDasharray="1.5,1.5" />
+      <polygon points={`34,${y_curr-4} 42,${y_curr} 34,${y_curr+4}`} fill={pointerColor} />
+      
+      {/* Left text label showing the exact temp */}
+      <text 
+        x="28" 
+        y={y_curr + 3.5} 
+        fill={pointerColor} 
+        textAnchor="end"
+        className="text-[9.5px] font-black font-mono"
+      >
+        {temp.toFixed(1)}°
+      </text>
+      
+      {/* Grid Scale Lines & Text labels on the Right */}
+      {/* 100C */}
+      <line x1="62" y1="5" x2="70" y2="5" stroke="#475569" strokeWidth="1" />
+      <text x="74" y="8.5" fill="#64748b" className="text-[9.5px] font-bold font-mono">100</text>
+      
+      {/* 0C */}
+      <line x1="62" y1={y_0} x2="72" y2={y_0} stroke="#64748b" strokeWidth="1.5" />
+      <text x="76" y={y_0+3.5} fill="#94a3b8" className="text-[10px] font-black font-mono">0</text>
+      
+      {/* -10C */}
+      <line x1="62" y1={y_minus_10} x2="70" y2={y_minus_10} stroke="#475569" strokeWidth="1" />
+      <text x="74" y={y_minus_10+3.5} fill="#64748b" className="text-[9.5px] font-bold font-mono">-10</text>
+    </svg>
+  );
+};
 
 const getBaseInterestRate = (country: string) => {
   switch (country) {
@@ -347,68 +482,335 @@ const getBaseInterestRate = (country: string) => {
   }
 }
 
-function getMockNews(stockName: string, language: string) {
+function getMockNews(stock: any, stockName: string, language: string) {
+  const stockId = stock?.id || "";
+
   if (language === 'KO') {
+    if (stockId === 'VN_NVL') {
+      return [
+        {
+          title: '1. 업종 및 시장 환경',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[시장환경] 베트남 부동산 시장은 정부의 금리 인하 및 규제 완화 기조에도 불구하고 거래 침체가 지속되며 전반적으로 위축된 상태입니다. 신규 프로젝트 승인 지연과 민간 개발사들의 사업 착수 지연이 건설 경기 동반 부진을 낳고 있어 노바랜드의 분양 매출 회복에 시간이 걸리고 있습니다.`
+        },
+        {
+          title: '2. 재무 건전성 및 리스크',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[재무분석] 노바랜드는 높은 회사채 발행 잔액과 만기 도래에 따른 유동성 리스크가 지속되고 있습니다. 채권단과의 만기 연장 및 자산 매각을 통한 채무 구조조정을 적극 추진 중이나, 현금성 자산 부족으로 인한 단기 부도 및 디폴트 리스크 모니터링이 핵심 요인입니다.`
+        },
+        {
+          title: '3. 성장 동력 및 가치 분석',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[가치전망] 핵심 리조트 단지(Aqua City, NovaWorld 등)의 인프라 정비 및 공사 재개가 장기 성장 모멘텀의 전제 조건입니다. 정부 차원의 특별 태스크포스(TF) 지원에 따른 법적 규제 해소 여부가 향후 기업 가치 정상화의 최대 분수령이 될 전망입니다.`
+        }
+      ]
+    }
+    if (stockId === 'KR_078600') {
+      return [
+        {
+          title: '1. 업종 및 시장 환경',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[배터리 시장] 전기차 배터리 시장의 에너지 밀도 향상 요구로 기존 흑연 음극재에 실리콘 음극재를 섞어 쓰는 비중이 급격히 확대되고 있습니다. 대주전자재료는 독보적인 실리콘 음극재 양산 기술력을 보유하여 글로벌 이차전지 소재 공급망에서 지위를 다지고 있습니다.`
+        },
+        {
+          title: '2. 재무 건전성 및 리스크',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[CapEx 리스크] 대규모 실리콘 음극재 생산 능력 증설을 위한 지속적인 설비 투자가 수반되면서 차입 부채 증가 및 일시적 영업 현금 흐름 둔화 부담이 발생하고 있습니다. 투자 자금 대비 전기차 수요 캐즘(일시적 수요 둔화) 장기화 시 고정비 부담이 가중될 수 있어 철저한 예산 관리가 필요합니다.`
+        },
+        {
+          title: '3. 성장 동력 및 가치 분석',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[성장 동력] 글로벌 메이저 완성차 기업들의 실리콘 음극재 적용 확대 모델 출시가 주당순이익(EPS) 및 밸류에이션 리레이팅의 핵심 엔진입니다. 차세대 제품 라인업 다변화를 통한 장기 성장이 기대됩니다.`
+        }
+      ]
+    }
+    if (stockId === 'US_AAPL') {
+      return [
+        {
+          title: '1. 업종 및 시장 환경',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[시장 트렌드] 글로벌 프리미엄 스마트폰 수요 정체 속에서 기기 자체에서 AI 기능을 구동하는 온디바이스 AI(애플 인텔리전스)로의 패러다임 전환이 교체 수요를 자극하고 있습니다.`
+        },
+        {
+          title: '2. 재무 건전성 및 리스크',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[재무분석] 애플은 연간 수천억 달러에 달하는 압도적 현금 창출력과 적극적 자사주 매입으로 강력한 재무 안정성을 보여주고 있습니다. 다만, 미국 및 유럽연합(EU)의 독점 규제 소송 및 앱스토어 수수료 구조 강제 개편 리스크가 최대 재무 위협 요인입니다.`
+        },
+        {
+          title: '3. 성장 동력 및 가치 분석',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[성장엔진] 앱스토어, 서비스 구독 등 고마진 부문의 매출 비중 지속 증가와 신규 하드웨어 폼팩터(폴더블 아이폰 등) 도입이 장기 밸류에이션 성장을 견인할 전망입니다.`
+        }
+      ]
+    }
+    if (stockId === 'US_BA') {
+      return [
+        {
+          title: '1. 업종 및 시장 환경',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[항공 산업] 글로벌 여객 수요 증가로 여객기 신규 인도 수요는 풍부하나, 공급망 차질과 제조 결함 이슈로 부품 조달 및 생산 적체가 전 세계적으로 장기화되고 있습니다.`
+        },
+        {
+          title: '2. 재무 건전성 및 리스크',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[유동성 위기] 안전 결함 조사 및 737 MAX 조립 속도 둔화로 현금 소모가 심화되어 재무 등급 강등 위험과 부채 상환 부담이 지속되고 있습니다. 재무 구조 개선을 위한 추가 자본 조달 가능성이 잠재적 리스크입니다.`
+        },
+        {
+          title: '3. 성장 동력 및 가치 분석',
+          publisher: 'AI 분석 엔진',
+          pubDate: '실시간',
+          link: 'https://aistudio.google.com',
+          content: `[가치 분석] 인도량 정상화와 품질 관리 신뢰성 회복이 최우선 선결 조건이며, 인도 지연으로 누적된 백오더(주문 대기분)의 안정적인 인도가 개시될 때 가치가 정상화될 것입니다.`
+        }
+      ]
+    }
+
+    // Default Neutral Fallback
     return [
       {
-        title: `${stockName}, 하반기 실적 개선 기대감에 기관 매수세 유입`,
-        publisher: '한국경제',
-        pubDate: '2시간 전',
-        link: 'https://www.hankyung.com'
+        title: '1. 업종 및 시장 환경',
+        publisher: 'AI 분석 엔진',
+        pubDate: '실시간',
+        link: 'https://aistudio.google.com',
+        content: `[시장 동향] ${stockName}이 속한 업계 전반의 디지털 전환 및 수요 변동성에 대응하여 시장 경쟁력 강화를 꾀하고 있습니다. 거시경제 변화와 글로벌 공급망 리스크 관리가 해당 업계의 주요 당면 과제로 대두되고 있습니다.`
       },
       {
-        title: `금리 변동성에 따른 ${stockName} 가치 평가 및 투자 리스크 분석`,
-        publisher: '매일경제',
-        pubDate: '5시간 전',
-        link: 'https://www.mk.co.kr'
+        title: '2. 재무 건전성 및 리스크',
+        publisher: 'AI 분석 엔진',
+        pubDate: '실시간',
+        link: 'https://aistudio.google.com',
+        content: `[리스크 분석] 거시경제의 금리 변동 우려 속에서 ${stockName}의 안정적인 현금 흐름 확보와 부채 비율 조절 등 재무 건전성 리스크 관리가 화두입니다. 자본 운용 효율성 강화를 위해 영업 현금 흐름 개선에 주력하고 있습니다.`
       },
       {
-        title: `${stockName}, 신규 사업 진출을 통한 중장기 성장 모멘텀 확보`,
-        publisher: '연합뉴스',
-        pubDate: '어제',
-        link: 'https://www.yna.co.kr'
+        title: '3. 성장 동력 및 가치 분석',
+        publisher: 'AI 분석 엔진',
+        pubDate: '실시간',
+        link: 'https://aistudio.google.com',
+        content: `[가치 평가] ${stockName}은 주력 사업의 경쟁 우위 유지 및 운영 효율성 개선을 통해 중장기 영업 마진 확보와 신성장 포트폴리오 다변화를 추진 중이며, 이는 기업의 장기 가치 상승에 긍정적인 요인입니다.`
       }
     ]
   } else if (language === 'VI') {
+    if (stockId === 'VN_NVL') {
+      return [
+        {
+          title: '1. Ngành & Môi trường thị trường',
+          publisher: 'AI phân tích',
+          pubDate: 'Thực tế',
+          link: 'https://aistudio.google.com',
+          content: `[Môi trường] Thị trường bất động sản Việt Nam vẫn trầm lắng dù Chính phủ có chính sách hạ lãi suất và tháo gỡ pháp lý. Tiến độ cấp phép dự án chậm và tâm lý e ngại của người mua đang ảnh hưởng trực tiếp đến doanh số bán hàng của Novaland.`
+        },
+        {
+          title: '2. Sức khỏe tài chính & Rủi ro',
+          publisher: 'AI phân tích',
+          pubDate: 'Thực tế',
+          link: 'https://aistudio.google.com',
+          content: `[Tài chính] Novaland đối mặt với rủi ro thanh khoản lớn do dư nợ trái phiếu đến hạn cao. Mặc dù công ty đang tích cực đàm phán gia hạn nợ và tái cơ cấu tài sản, tình trạng thiếu hụt dòng tiền ngắn hạn vẫn là thách thức cực kỳ nghiêm trọng.`
+        },
+        {
+          title: '3. Động lực tăng trưởng & Định giá',
+          publisher: 'AI phân tích',
+          pubDate: 'Thực tế',
+          link: 'https://aistudio.google.com',
+          content: `[Triển vọng] Việc tái khởi công các dự án trọng điểm như Aqua City, NovaWorld Phan Thiết là chìa khóa phục hồi doanh thu. Tiến độ tháo gỡ pháp lý từ các tổ chức ban ngành sẽ quyết định việc đánh giá lại giá trị cổ phiếu NVL.`
+        }
+      ]
+    }
+    if (stockId === 'KR_078600') {
+      return [
+        {
+          title: '1. Ngành & Môi trường thị trường',
+          publisher: 'AI phân tích',
+          pubDate: 'Thực tế',
+          link: 'https://aistudio.google.com',
+          content: `[Thị trường] Xu hướng tăng hàm lượng Silicon trong cực âm pin xe điện đang mở rộng mạnh mẽ. Daejoo Electronic Materials giữ vị thế dẫn đầu trong chuỗi cung ứng vật liệu pin toàn cầu nhờ công nghệ sản xuất hàng loạt độc quyền.`
+        },
+        {
+          title: '2. Sức khỏe tài chính & Rủi ro',
+          publisher: 'AI phân tích',
+          pubDate: 'Thực tế',
+          link: 'https://aistudio.google.com',
+          content: `[Rủi ro CapEx] Chi phí đầu tư lớn cho việc nâng công suất nhà máy dẫn đến tăng nợ vay tài chính ngắn hạn. Nếu giai đoạn chững lại của thị trường xe điện toàn cầu kéo dài, chi phí cố định tăng cao có thể ảnh hưởng biên lợi nhuận.`
+        },
+        {
+          title: '3. Động lực tăng trưởng & Định giá',
+          publisher: 'AI phân tích',
+          pubDate: 'Thực tế',
+          link: 'https://aistudio.google.com',
+          content: `[Động lực] Việc các hãng xe điện lớn tích hợp cực âm Silicon vào các dòng xe thế hệ mới là động lực thúc đẩy tăng trưởng định giá cổ phiếu.`
+        }
+      ]
+    }
+
+    // Default Neutral Fallback
     return [
       {
-        title: `${stockName} kỳ vọng kết quả kinh doanh tăng trưởng mạnh nửa cuối năm`,
-        publisher: 'Cafef',
-        pubDate: '2 giờ trước',
-        link: 'https://cafef.vn'
+        title: '1. Ngành & Môi trường thị trường',
+        publisher: 'AI phân tích',
+        pubDate: 'Thực tế',
+        link: 'https://aistudio.google.com',
+        content: `[Thị trường] Doanh nghiệp ${stockName} đang nỗ lực nâng cao năng lực cạnh tranh trước các biến động về nhu cầu và xu hướng chuyển đổi số. Việc quản trị rủi ro chuỗi cung ứng là ưu tiên hàng đầu của ngành.`
       },
       {
-        title: `Phân tích định giá và rủi ro đầu tư của ${stockName} trước biến động lãi suất`,
-        publisher: 'Vietstock',
-        pubDate: '5 giờ trước',
-        link: 'https://vietstock.vn'
+        title: '2. Sức khỏe tài chính & Rủi ro',
+        publisher: 'AI phân tích',
+        pubDate: 'Thực tế',
+        link: 'https://aistudio.google.com',
+        content: `[Rủi ro tài chính] Quản trị rủi ro thanh khoản, duy trì dòng tiền ổn định và kiểm soát tỷ lệ nợ vay là những yếu tố then chốt đối với ${stockName} trong bối cảnh vĩ mô còn nhiều biến động về lãi suất.`
       },
       {
-        title: `${stockName} mở rộng hoạt động kinh doanh tạo động lực tăng trưởng dài hạn`,
-        publisher: 'VnExpress',
-        pubDate: 'Hôm qua',
-        link: 'https://vnexpress.net'
+        title: '3. Động lực tăng trưởng & Định giá',
+        publisher: 'AI phân tích',
+        pubDate: 'Thực tế',
+        link: 'https://aistudio.google.com',
+        content: `[Triển vọng] Việc cải thiện hiệu quả vận hành và mở rộng danh mục kinh doanh cốt lõi của ${stockName} sẽ giúp củng cố biên lợi nhuận trung hạn, tạo tiền đề nâng cao định giá cổ phiếu.`
       }
     ]
   } else {
+    if (stockId === 'VN_NVL') {
+      return [
+        {
+          title: '1. Sector & Market Environment',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Market Outlook] The Vietnamese real estate sector remains sluggish despite government interest rate cuts and supportive policies. Delayed project approvals and slow market absorption rates directly pressure Novaland's presales performance.`
+        },
+        {
+          title: '2. Financial Health & Debt Risks',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Debt Analysis] Novaland faces severe liquidity risks due to high corporate debt maturities. While management is actively restructuring debt and extending bond maturities, short-term cash flow constraints remain a critical threat.`
+        },
+        {
+          title: '3. Growth Drivers & Valuation',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Valuation] Resuming construction at flagship projects like Aqua City and NovaWorld Phan Thiet is essential for revenue recovery. Resolution of legal bottlenecks under government support will be the primary driver for NVL's valuation recovery.`
+        }
+      ]
+    }
+    if (stockId === 'KR_078600') {
+      return [
+        {
+          title: '1. Sector & Market Environment',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Sector Outlook] The adoption of silicon anode materials is expanding rapidly in the EV battery sector to enhance energy density. Daejoo Electronic Materials leads the industry with its proprietary mass production technology.`
+        },
+        {
+          title: '2. Financial Health & Debt Risks',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[CapEx Risks] Continuous capital expenditures for factory expansion have led to increased debt and temporary cash flow pressure. Prolonged EV market slowdowns could raise fixed-cost burdens, requiring strict budget management.`
+        },
+        {
+          title: '3. Growth Drivers & Valuation',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Valuation] The rollout of new EV models utilizing silicon anodes by major global OEMs serves as the primary catalyst for EPS and valuation multiple rerating.`
+        }
+      ]
+    }
+    if (stockId === 'US_AAPL') {
+      return [
+        {
+          title: '1. Sector & Market Environment',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Market Environment] While premium smartphone demand remains mature, the transition to on-device AI (Apple Intelligence) is serving as a major catalyst for device upgrade cycles.`
+        },
+        {
+          title: '2. Financial Health & Debt Risks',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Financial Health] Apple generates dominant free cash flows, supporting massive buybacks and dividends. However, regulatory antitrust lawsuits in the US and EU regarding App Store policies present the main risk.`
+        },
+        {
+          title: '3. Growth Drivers & Valuation',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Valuation] The growing share of high-margin services revenue and potential smart form-factor innovations (such as foldable iPhones) support long-term valuation premiums.`
+        }
+      ]
+    }
+    if (stockId === 'US_BA') {
+      return [
+        {
+          title: '1. Sector & Market Environment',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Industry Trend] While global passenger travel demand drives strong aircraft backlogs, supply chain bottlenecks and manufacturing quality issues constrain Boeing's production capacity.`
+        },
+        {
+          title: '2. Financial Health & Debt Risks',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Liquidity Risk] Delivery delays and regulatory audits have increased cash burn, threatening credit ratings and raising debt burdens. Potential equity dilution for debt repayment remains a key concern.`
+        },
+        {
+          title: '3. Growth Drivers & Valuation',
+          publisher: 'AI Analyst',
+          pubDate: 'Real-time',
+          link: 'https://aistudio.google.com',
+          content: `[Valuation] Restoring quality control credibility and normalizing delivery rates are crucial for Boeing. Valuation recovery depends on successfully clearing massive delivery backlogs.`
+        }
+      ]
+    }
+
+    // Default Neutral Fallback
     return [
       {
-        title: `${stockName} shares surge on strong institutional buying interest`,
-        publisher: 'MarketWatch',
-        pubDate: '2 hours ago',
-        link: 'https://www.marketwatch.com'
+        title: '1. Sector & Market Environment',
+        publisher: 'AI Analyst',
+        pubDate: 'Real-time',
+        link: 'https://aistudio.google.com',
+        content: `[Market Trends] ${stockName} is enhancing its market competitiveness in response to digital transformation and demand shifts. Supply chain management remains a key focal point for the industry.`
       },
       {
-        title: `Valuation analysis: Assessing risks and upside for ${stockName}`,
-        publisher: 'Bloomberg',
-        pubDate: '5 hours ago',
-        link: 'https://www.bloomberg.com'
+        title: '2. Financial Health & Debt Risks',
+        publisher: 'AI Analyst',
+        pubDate: 'Real-time',
+        link: 'https://aistudio.google.com',
+        content: `[Risk Assessment] Managing financial health, maintaining stable free cash flows, and controlling debt ratios are central tasks for ${stockName} under macroeconomic fluctuations.`
       },
       {
-        title: `${stockName} expands operations to secure long-term growth momentum`,
-        publisher: 'Reuters',
-        pubDate: 'Yesterday',
-        link: 'https://www.reuters.com'
+        title: '3. Growth Drivers & Valuation',
+        publisher: 'AI Analyst',
+        pubDate: 'Real-time',
+        link: 'https://aistudio.google.com',
+        content: `[Valuation] Focus on improving operational efficiency and diversifying growth portfolios will support ${stockName}'s mid-term margin stability and drive long-term corporate value compounding.`
       }
     ]
   }
@@ -753,7 +1155,7 @@ function CustomBpsChart({ stock, currentPrice, t }: { stock: any; currentPrice: 
 }
 
 function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: { stock: any; currentPrice: number; fairPrice: number; language: string; t: any }) {
-  const consensusTarget = Math.round(fairPrice * 1.15)
+  const consensusTarget = stock.consensusTarget ? Math.round(stock.consensusTarget) : Math.round(fairPrice * 1.15)
   const currency = stock.currency
 
   const minVal = Math.min(currentPrice, fairPrice, consensusTarget) * 0.9
