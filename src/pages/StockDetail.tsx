@@ -187,28 +187,28 @@ export default function StockDetail() {
       {/* Top Metrics Grid (4-Card) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('currentPrice')}</span>
+          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('currentPrice')}</span>
           <span className="block text-xl md:text-2xl font-black text-slate-200 mt-1.5 font-mono">
             {stock.currency} {currentPrice.toLocaleString()}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('fairPrice')}</span>
+          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('fairPrice')}</span>
           <span className="block text-xl md:text-2xl font-black text-blue-400 mt-1.5 font-mono">
             {stock.currency} {Math.round(fairPrice).toLocaleString()}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('baseInterestRate')}</span>
+          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('baseInterestRate')}</span>
           <span className="block text-xl md:text-2xl font-black text-amber-500 mt-1.5 font-mono">
             {baseRate}
           </span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-500 font-bold uppercase tracking-wider">{t('expectedReturn')}</span>
+          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('expectedReturn')}</span>
           <span className={`block text-xl md:text-2xl font-black mt-1.5 font-mono flex items-center gap-1.5 ${
             expectedReturn > 10 ? 'text-emerald-400' : 'text-slate-300'
           }`}>
