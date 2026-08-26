@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { Star, ArrowLeft, Trash2, TrendingUp } from 'lucide-react'
 import { COUNTRY_NAMES } from '../data/mockStocks'
+import { translateIndustry } from '../data/translations'
 import { WeatherIcon } from '../components/WeatherIcon'
 import { useLanguage } from '../context/LanguageContext'
 import { useLivePrices } from '../context/LivePriceContext'
@@ -118,7 +119,7 @@ export default function Watchlist() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
-                      {COUNTRY_NAMES[stock.country as 'KR' | 'US' | 'VN']} | {stock.industry}
+                      {COUNTRY_NAMES[stock.country as 'KR' | 'US' | 'VN' | 'CN']} | {translateIndustry(stock.industry)}
                     </span>
                     <h4 className="text-base font-bold text-slate-100 group-hover:text-blue-400 transition-colors mt-0.5">
                       {displayName}

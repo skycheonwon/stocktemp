@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Star, TrendingUp, Zap } from 'lucide-react'
 import { COUNTRY_NAMES } from '../data/mockStocks'
+import { translateIndustry } from '../data/translations'
 import { useLanguage } from '../context/LanguageContext'
 import { useLivePrices } from '../context/LivePriceContext'
 import {
@@ -157,8 +158,8 @@ export default function StockDetail() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-              {COUNTRY_NAMES[stock.country as 'KR' | 'US' | 'VN' | 'CN']} | {stock.industry}
+            <span className="text-xs font-bold text-slate-550 uppercase tracking-wider block">
+              {COUNTRY_NAMES[stock.country as 'KR' | 'US' | 'VN' | 'CN']} | {translateIndustry(stock.industry)}
             </span>
             <div className="flex items-center gap-2 mt-0.5">
               <h2 className="text-xl md:text-2xl font-black text-slate-100">

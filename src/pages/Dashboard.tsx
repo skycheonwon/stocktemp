@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext'
 import { useLivePrices } from '../context/LivePriceContext'
 import { COUNTRY_NAMES } from '../data/mockStocks'
 import { WeatherIcon } from '../components/WeatherIcon'
+import { translateIndustry } from '../data/translations'
 import type { TranslationKey } from '../data/translations'
 import {
   calculateFairPrice,
@@ -61,7 +62,7 @@ export default function Dashboard() {
     const filteredByCountry = selectedCountry === 'ALL'
       ? stocks
       : stocks.filter(s => s.country === selectedCountry)
-    const industries = filteredByCountry.map(s => s.industry).filter(Boolean)
+    const industries = filteredByCountry.map(s => translateIndustry(s.industry)).filter(Boolean)
     return ['ALL', ...Array.from(new Set(industries))].sort()
   }, [stocks, selectedCountry])
 
@@ -113,7 +114,7 @@ export default function Dashboard() {
         stock.ticker.includes(searchQuery)
 
       const matchesCountry = selectedCountry === 'ALL' || stock.country === selectedCountry
-      const matchesIndustry = selectedIndustry === 'ALL' || stock.industry === selectedIndustry
+      const matchesIndustry = selectedIndustry === 'ALL' || translateIndustry(stock.industry) === selectedIndustry
 
       return matchesSearch && matchesCountry && matchesIndustry
     })
@@ -620,7 +621,7 @@ function StockCard({ stock, rank }: { stock: any; rank?: number }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-            {COUNTRY_NAMES[stock.country as 'KR' | 'US' | 'VN']} | {stock.industry}
+            {COUNTRY_NAMES[stock.country as 'KR' | 'US' | 'VN']} | {translateIndustry(stock.industry)}
           </span>
           <h4 className="text-base font-bold text-slate-100 group-hover:text-blue-400 transition-colors mt-0.5">
             {displayName}
