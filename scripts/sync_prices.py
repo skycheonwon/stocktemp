@@ -75,19 +75,85 @@ def fetch_kr_stock_naver(ticker):
 
 def fetch_yfinance_data(yahoo_ticker):
     """
-    Fetches price, EPS, and targetMeanPrice from Yahoo Finance using yfinance library.
+    Fetches price, EPS, targetMeanPrice, ROE, PBR, and Debt Ratio from Yahoo Finance.
     """
+    price, eps, target_price = None, None, None
+    roe, pbr, debt_ratio = None, None, None
     try:
         import yfinance as yf
         ticker_obj = yf.Ticker(yahoo_ticker)
         info = ticker_obj.info
+        
         price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice")
         eps = info.get("trailingEps") or info.get("forwardEps")
         target_price = info.get("targetMeanPrice")
-        return float(price) if price else None, float(eps) if eps else None, float(target_price) if target_price else None
+        
+        # 1. Try info dictionary first
+        pbr = info.get("priceToBook")
+        raw_roe = info.get("returnOnEquity")
+        if raw_roe is not None:
+            roe = float(raw_roe) * 100
+        debt_ratio = info.get("debtToEquity")
+        
+        # 2. Fall back to financial statements calculation if any metric is missing
+        if roe is None or pbr is None or debt_ratio is None:
+            try:
+                bs = ticker_obj.quarterly_balance_sheet
+                fin = ticker_obj.quarterly_financials
+                if bs.empty:
+                    bs = ticker_obj.balance_sheet
+                if fin.empty:
+                    fin = ticker_obj.financials
+                    
+                if not bs.empty:
+                    latest_date = bs.columns[0]
+                    latest_bs = bs[latest_date]
+                    
+                    equity = latest_bs.get("Stockholders Equity") or latest_bs.get("Common Stock Equity")
+                    
+                    if equity is not None and equity <= 0:
+                        # Deficit / negative equity makes these metrics meaningless, set to None
+                        roe = None
+                        pbr = None
+                        debt_ratio = None
+                    else:
+                        total_debt = latest_bs.get("Total Debt")
+                        total_liab = latest_bs.get("Total Liabilities Net Minority Interest") or latest_bs.get("Total Liabilities")
+                        
+                        if debt_ratio is None and equity:
+                            target_liab = total_liab if total_liab is not None else total_debt
+                            if target_liab is not None:
+                                debt_ratio = float((target_liab / equity) * 100)
+                                
+                        if pbr is None and equity and price:
+                            shares = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding")
+                            if shares:
+                                bps = equity / shares
+                                pbr = float(price / bps)
+                                
+                        if roe is None and equity and not fin.empty:
+                            net_inc_row = None
+                            for row in fin.index:
+                                if "Net Income From Continuing Operation" in row or "Net Income" in row:
+                                    net_inc_row = row
+                                    break
+                            if net_inc_row:
+                                net_inc_ttm = fin.loc[net_inc_row].head(4).sum()
+                                roe = float((net_inc_ttm / equity) * 100)
+            except Exception:
+                pass
+                
+        price = float(price) if price else None
+        eps = float(eps) if eps else None
+        target_price = float(target_price) if target_price else None
+        roe = float(roe) if roe is not None else None
+        pbr = float(pbr) if pbr is not None else None
+        debt_ratio = float(debt_ratio) if debt_ratio is not None else None
+        
+        return price, eps, target_price, roe, pbr, debt_ratio
     except Exception as e:
         print(f"yfinance fetch failed for {yahoo_ticker}: {e}")
-    return None, None, None
+    return None, None, None, None, None, None
 
 import threading
 gemini_lock = threading.Lock()
@@ -319,36 +385,37 @@ def process_single_stock(doc):
     time.sleep(random.uniform(0.0, 0.2))
     
     price, eps, target_price = None, None, None
+    roe, pbr, debt_ratio = None, None, None
     try:
         if country == "KR":
             # Try Naver first for Korea
             price, eps = fetch_kr_stock_naver(naver_ticker)
-            # Fetch target_price from yfinance (try .KS then .KQ)
+            # Fetch target_price, roe, pbr, debt_ratio from yfinance (try .KS then .KQ)
             yahoo_ticker = f"{ticker}.KS"
-            _, _, target_price = fetch_yfinance_data(yahoo_ticker)
-            if target_price is None:
+            _, _, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
+            if target_price is None and roe is None:
                 yahoo_ticker = f"{ticker}.KQ"
-                _, _, target_price = fetch_yfinance_data(yahoo_ticker)
+                _, _, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
                 
             if not price:
                 # Fallback to yfinance
                 yahoo_ticker = f"{ticker}.KS"
-                price, eps, target_price = fetch_yfinance_data(yahoo_ticker)
+                price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
                 if not price:
                     yahoo_ticker = f"{ticker}.KQ"
-                    price, eps, target_price = fetch_yfinance_data(yahoo_ticker)
+                    price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
         elif country == "US":
             # Map Apple.O to AAPL for yfinance
             yahoo_ticker = naver_ticker.split('.')[0] if '.' in naver_ticker else naver_ticker
-            price, eps, target_price = fetch_yfinance_data(yahoo_ticker)
+            price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
         elif country == "VN":
             # Map VNM.HM to VNM.VN for yfinance
             yahoo_ticker = f"{ticker}.VN"
-            price, eps, target_price = fetch_yfinance_data(yahoo_ticker)
+            price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
         elif country == "CN":
             # Use naver_ticker directly since it contains the correct .SS or .SZ suffix for yfinance
             yahoo_ticker = naver_ticker
-            price, eps, target_price = fetch_yfinance_data(yahoo_ticker)
+            price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
     except Exception as e:
         print(f"Error processing {stock_id}: {e}")
         
@@ -361,6 +428,12 @@ def process_single_stock(doc):
             update_data["eps"] = eps
         if target_price is not None:
             update_data["consensusTarget"] = target_price
+        if roe is not None:
+            update_data["roe"] = roe
+        if pbr is not None:
+            update_data["pbr"] = pbr
+        if debt_ratio is not None:
+            update_data["debtRatio"] = debt_ratio
             
         return stock_id, update_data
         

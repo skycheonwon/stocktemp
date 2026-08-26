@@ -12,6 +12,13 @@ export interface Stock {
   tradingViewSymbol: string;
   naverTicker: string;
   quarterlyData?: any[];
+  consensusTarget?: number;
+  latestNews_KO?: any[];
+  latestNews_EN?: any[];
+  latestNews_VI?: any[];
+  roe?: number;
+  pbr?: number;
+  debtRatio?: number;
 }
 
 export const MOCK_STOCKS: Stock[] = [

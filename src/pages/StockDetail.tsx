@@ -303,6 +303,36 @@ export default function StockDetail() {
                   {stock.currency} {Math.round(currentEps).toLocaleString()}
                 </span>
               </div>
+
+              {/* 4. Return on Equity (ROE) */}
+              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
+                  {t('roe')}
+                </span>
+                <span className="block font-black text-emerald-400 font-mono text-sm sm:text-base mt-0.5">
+                  {stock.roe !== undefined && stock.roe !== null ? `${stock.roe.toFixed(1)}%` : '-'}
+                </span>
+              </div>
+
+              {/* 5. Price to Book Ratio (PBR) */}
+              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
+                  {t('pbr')}
+                </span>
+                <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
+                  {stock.pbr !== undefined && stock.pbr !== null ? `${stock.pbr.toFixed(2)}x` : '-'}
+                </span>
+              </div>
+
+              {/* 6. Debt to Equity Ratio (부채비율) */}
+              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
+                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
+                  {t('debtRatio')}
+                </span>
+                <span className="block font-black text-rose-400 font-mono text-sm sm:text-base mt-0.5">
+                  {stock.debtRatio !== undefined && stock.debtRatio !== null ? `${stock.debtRatio.toFixed(1)}%` : '-'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
