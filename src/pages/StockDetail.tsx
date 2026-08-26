@@ -276,8 +276,8 @@ export default function StockDetail() {
             <div className="grid grid-cols-3 gap-2.5 border-t border-slate-800/50 pt-5">
               {/* 1. Target P/E Multiple (AI Target) */}
               <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
-                  {language === 'KO' ? '적정 P/E (AI)' : language === 'VI' ? 'P/E hợp lý (AI)' : 'Fair P/E (AI)'}
+                <span className="block text-slate-550 text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                  {language === 'KO' ? '적정 P/E (AI산정)' : language === 'VI' ? 'P/E hợp lý (AI chọn)' : 'Fair P/E (AI Calc)'}
                 </span>
                 <span className="block font-black text-blue-400 font-mono text-sm sm:text-base mt-0.5">
                   {targetPe}x
