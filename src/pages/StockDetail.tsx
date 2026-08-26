@@ -272,66 +272,73 @@ export default function StockDetail() {
               </div>
             </div>
 
-            {/* Core Metrics Grid */}
-            <div className="grid grid-cols-3 gap-2.5 border-t border-slate-800/50 pt-5">
-              {/* 1. Target P/E Multiple (AI Target) */}
-              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
-                  {language === 'KO' ? '적정 P/E (AI산정)' : language === 'VI' ? 'P/E hợp lý (AI chọn)' : 'Fair P/E (AI Calc)'}
-                </span>
-                <span className="block font-black text-blue-400 font-mono text-sm sm:text-base mt-0.5">
-                  {targetPe}x
-                </span>
+            {/* Core Metrics Unified Box (Option 2) */}
+            <div className="mt-4 bg-slate-950/30 border border-slate-850/80 rounded-2xl p-4">
+              <div className="grid grid-cols-3 text-center divide-x divide-slate-800/40">
+                {/* 1. Target P/E Multiple (AI Target) */}
+                <div className="space-y-1 min-w-0">
+                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                    {language === 'KO' ? '적정 P/E (AI산정)' : language === 'VI' ? 'P/E hợp lý (AI chọn)' : 'Fair P/E (AI Calc)'}
+                  </span>
+                  <span className="block font-black text-blue-400 font-mono text-sm sm:text-base mt-0.5">
+                    {targetPe}x
+                  </span>
+                </div>
+
+                {/* 2. Current P/E Ratio */}
+                <div className="space-y-1 min-w-0">
+                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                    {language === 'KO' ? '현재 P/E' : language === 'VI' ? 'P/E hiện tại' : 'Current P/E'}
+                  </span>
+                  <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
+                    {(currentPrice / currentEps).toFixed(1)}x
+                  </span>
+                </div>
+
+                {/* 3. Earnings Per Share (EPS) */}
+                <div className="space-y-1 min-w-0">
+                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                    {language === 'KO' ? '현재 EPS' : language === 'VI' ? 'EPS hiện tại' : 'Current EPS'}
+                  </span>
+                  <span className="block font-black text-slate-200 font-mono text-xs sm:text-sm mt-0.5 truncate px-1">
+                    {stock.currency} {Math.round(currentEps).toLocaleString()}
+                  </span>
+                </div>
               </div>
 
-              {/* 2. Current P/E Ratio */}
-              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
-                  {language === 'KO' ? '현재 P/E' : language === 'VI' ? 'P/E hiện tại' : 'Current P/E'}
-                </span>
-                <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
-                  {(currentPrice / currentEps).toFixed(1)}x
-                </span>
-              </div>
+              {/* Horizontal Divider */}
+              <div className="my-3.5 border-t border-slate-800/40"></div>
 
-              {/* 3. Earnings Per Share (EPS) */}
-              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
-                  {language === 'KO' ? '현재 EPS' : language === 'VI' ? 'EPS hiện tại' : 'Current EPS'}
-                </span>
-                <span className="block font-black text-slate-200 font-mono text-[11px] sm:text-xs md:text-sm mt-0.5 truncate">
-                  {stock.currency} {Math.round(currentEps).toLocaleString()}
-                </span>
-              </div>
+              <div className="grid grid-cols-3 text-center divide-x divide-slate-800/40">
+                {/* 4. Return on Equity (ROE) */}
+                <div className="space-y-1 min-w-0">
+                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                    {t('roe')}
+                  </span>
+                  <span className="block font-black text-emerald-400 font-mono text-sm sm:text-base mt-0.5">
+                    {stock.roe !== undefined && stock.roe !== null ? `${stock.roe.toFixed(1)}%` : '-'}
+                  </span>
+                </div>
 
-              {/* 4. Return on Equity (ROE) */}
-              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
-                  {t('roe')}
-                </span>
-                <span className="block font-black text-emerald-400 font-mono text-sm sm:text-base mt-0.5">
-                  {stock.roe !== undefined && stock.roe !== null ? `${stock.roe.toFixed(1)}%` : '-'}
-                </span>
-              </div>
+                {/* 5. Price to Book Ratio (PBR) */}
+                <div className="space-y-1 min-w-0">
+                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                    {t('pbr')}
+                  </span>
+                  <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
+                    {stock.pbr !== undefined && stock.pbr !== null ? `${stock.pbr.toFixed(2)}x` : '-'}
+                  </span>
+                </div>
 
-              {/* 5. Price to Book Ratio (PBR) */}
-              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
-                  {t('pbr')}
-                </span>
-                <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
-                  {stock.pbr !== undefined && stock.pbr !== null ? `${stock.pbr.toFixed(2)}x` : '-'}
-                </span>
-              </div>
-
-              {/* 6. Debt to Equity Ratio (부채비율) */}
-              <div className="bg-slate-950/40 p-2 sm:p-3 rounded-xl border border-slate-850 text-center space-y-1 min-w-0">
-                <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-tight whitespace-normal">
-                  {t('debtRatio')}
-                </span>
-                <span className="block font-black text-rose-400 font-mono text-sm sm:text-base mt-0.5">
-                  {stock.debtRatio !== undefined && stock.debtRatio !== null ? `${stock.debtRatio.toFixed(1)}%` : '-'}
-                </span>
+                {/* 6. Debt to Equity Ratio (부채비율) */}
+                <div className="space-y-1 min-w-0">
+                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                    {t('debtRatio')}
+                  </span>
+                  <span className="block font-black text-rose-400 font-mono text-sm sm:text-base mt-0.5">
+                    {stock.debtRatio !== undefined && stock.debtRatio !== null ? `${stock.debtRatio.toFixed(1)}%` : '-'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
