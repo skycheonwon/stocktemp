@@ -16,9 +16,16 @@ export interface Stock {
   latestNews_KO?: any[];
   latestNews_EN?: any[];
   latestNews_VI?: any[];
+  bps?: number;
   roe?: number;
   pbr?: number;
   debtRatio?: number;
+  createdBy?: string;
+  createdByDisplayName?: string;
+  recommendationCount?: number;
+  dislikeCount?: number;
+  recommendationReason?: string;
+  isAwaitingSync?: boolean;
 }
 
 export const MOCK_STOCKS: Stock[] = [

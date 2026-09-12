@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import Navbar from './Navbar'
 import BottomNav from './BottomNav'
+import Footer from './Footer'
 
 export default function Layout() {
   return (
@@ -12,6 +13,9 @@ export default function Layout() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 md:py-8 pb-24 md:pb-8">
         <Outlet />
       </main>
+
+      {/* Legal Footer */}
+      <Footer />
 
       {/* Mobile Navigation */}
       <BottomNav />

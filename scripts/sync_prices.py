@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import random
+import threading
 import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -225,8 +226,9 @@ def generate_ai_analysis_reports_all_langs(stock_name, ticker, country, industry
         f"in the '{industry}' industry. "
         f"Based on your knowledge of this company, its sector, and market environment, "
         f"provide a factual investment brief that would help retail investors decide before buying. "
-        f"Return a JSON object with exactly three language keys: 'ko', 'en', 'vi'. "
-        f"Each key maps to an object with three fields: "
+        f"Return a JSON object with exactly four keys: 'ko', 'en', 'vi', 'recommended_pe'. "
+        f"'recommended_pe' must be a single integer representing your recommended target P/E multiple (between 5 and 60) for this stock based on its growth rate, sector average, and risk profile. "
+        f"Each of the 'ko', 'en', 'vi' keys maps to an object with three fields: "
         f"'industry_outlook': 2-3 sentences on industry trends and competitive positioning (in that language), "
         f"'debt_and_risks': 2-3 sentences on financial health, key risks, debt situation (in that language), "
         f"'growth_drivers': 2-3 sentences on growth catalysts, business model strengths, valuation outlook (in that language). "
@@ -254,6 +256,16 @@ def generate_ai_analysis_reports_all_langs(stock_name, ticker, country, industry
             parsed = json.loads(clean_json)
         except Exception as je:
             print(f"Error parsing Gemini JSON output: {je}. Raw output was: {summary_text}")
+            
+    # Parse recommended PE multiple from AI response
+    recommended_pe = 15 # default fallback
+    if isinstance(parsed, dict) and "recommended_pe" in parsed:
+        try:
+            val = int(parsed["recommended_pe"])
+            if 5 <= val <= 60:
+                recommended_pe = val
+        except Exception:
+            pass
             
     # Generate reports for each language
     langs = ["ko", "en", "vi"]
@@ -312,7 +324,7 @@ def generate_ai_analysis_reports_all_langs(stock_name, ticker, country, industry
             })
         result[lang] = reports
         
-    return result
+    return result, recommended_pe
 
 def fetch_google_news_rss(query, lang_code, country_code, stock_name, limit=3):
     import urllib.request
@@ -379,7 +391,7 @@ def process_single_stock(doc):
     stock_data = doc.to_dict()
     country = stock_data.get("country")
     ticker = stock_data.get("ticker")
-    naver_ticker = stock_data.get("naverTicker")
+    naver_ticker = stock_data.get("naverTicker") or ""
     
     # Tiny random stagger to stagger parallel queries nicely
     time.sleep(random.uniform(0.0, 0.2))
@@ -389,7 +401,7 @@ def process_single_stock(doc):
     try:
         if country == "KR":
             # Try Naver first for Korea
-            price, eps = fetch_kr_stock_naver(naver_ticker)
+            price, eps = fetch_kr_stock_naver(naver_ticker or ticker)
             # Fetch target_price, roe, pbr, debt_ratio from yfinance (try .KS then .KQ)
             yahoo_ticker = f"{ticker}.KS"
             _, _, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
@@ -406,7 +418,7 @@ def process_single_stock(doc):
                     price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
         elif country == "US":
             # Map Apple.O to AAPL for yfinance
-            yahoo_ticker = naver_ticker.split('.')[0] if '.' in naver_ticker else naver_ticker
+            yahoo_ticker = naver_ticker.split('.')[0] if '.' in naver_ticker else (naver_ticker or ticker)
             price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
         elif country == "VN":
             # Map VNM.HM to VNM.VN for yfinance
@@ -414,17 +426,25 @@ def process_single_stock(doc):
             price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
         elif country == "CN":
             # Use naver_ticker directly since it contains the correct .SS or .SZ suffix for yfinance
-            yahoo_ticker = naver_ticker
+            yahoo_ticker = naver_ticker or ticker
             price, eps, target_price, roe, pbr, debt_ratio = fetch_yfinance_data(yahoo_ticker)
     except Exception as e:
         print(f"Error processing {stock_id}: {e}")
         
+    # If EPS is missing or placeholder <= 0, try to compute from quarterlyData
+    if (eps is None or eps <= 0) and stock_data.get("quarterlyData"):
+        qd = stock_data.get("quarterlyData")
+        q_eps_sum = sum(q.get("eps", 0) for q in qd)
+        if q_eps_sum > 0:
+            eps = round(q_eps_sum, 2)
+
     if price:
         update_data = {
             "currentPrice": price,
+            "isAwaitingSync": False,
             "lastUpdated": firestore.SERVER_TIMESTAMP
         }
-        if eps is not None:
+        if eps is not None and eps > 0:
             update_data["eps"] = eps
         if target_price is not None:
             update_data["consensusTarget"] = target_price
@@ -514,7 +534,7 @@ def main():
         # Use Korean name for better Korean-language analysis quality
         display_name = korean_name if korean_name else name
         
-        analysis_data = generate_ai_analysis_reports_all_langs(
+        analysis_data, recommended_pe = generate_ai_analysis_reports_all_langs(
             display_name, ticker, country, industry, GEMINI_API_KEY
         )
         
@@ -525,6 +545,9 @@ def main():
             update_data["latestNews_EN"] = analysis_data["en"]
         if analysis_data.get("vi"):
             update_data["latestNews_VI"] = analysis_data["vi"]
+            
+        if recommended_pe:
+            update_data["defaultTargetPe"] = recommended_pe
             
         return stock_id, update_data
     

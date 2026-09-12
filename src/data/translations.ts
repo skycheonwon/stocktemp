@@ -9,7 +9,12 @@ export const TRANSLATIONS = {
     
     // Dashboard
     heroTitle: '현재 시장의 온도는 몇 도인가요?',
-    heroDesc: 'StockTemp(주식온도)는 EPS(주당순이익) 및 재무 데이터와 실시간 주가를 분석하여 주식의 과열 또는 저평가 상태를 날씨 체감 온도(-10°C ~ 50°C)를 기준으로 명확히 보여줍니다.',
+    heroDesc: 'StockTemp(주식온도)는 EPS(주당순이익) 및 재무 데이터와 최근 시장 주가를 기반으로 AI가 주식의 고평가·저평가 상태를 분석하여, 날씨 체감 온도(-10°C ~ 100°C)를 기준으로 명확히 보여줍니다.',
+    heroCommunityTitle: '100% 무료 & 유저 참여형 플랫폼',
+    heroCommunityDesc: '종목 추가 시 AI가 고평가·저평가 상태를 실시간으로 즉시 분석해 드립니다. 누구나 자유롭게 관심 종목을 등록하고, 투표와 의견을 나눠 시장의 체감 온도를 함께 완성해 보세요. (100% 무료)',
+    heroBadgeFree: '100% 무료 개방',
+    heroBadgeAddStock: '직접 종목 등록',
+    heroBadgeVote: '집단지성 투표 & 의견',
     kospi: 'KOSPI 🇰🇷',
     kosdaq: 'KOSDAQ 🇰🇷',
     sp500: 'S&P 500 🇺🇸',
@@ -35,9 +40,10 @@ export const TRANSLATIONS = {
     industry: '산업군',
     country: '국가',
     all: '전체',
-    korea: '한국 🇰🇷',
-    usa: '미국 🇺🇸',
-    vietnam: '베트남 🇻🇳',
+    korea: '한국',
+    usa: '미국',
+    vietnam: '베트남',
+    china: '중국',
 
     // Stock Detail
     stockNotFound: '종목을 찾을 수 없습니다.',
@@ -70,6 +76,12 @@ export const TRANSLATIONS = {
     consensusVsFair: '목표가 vs 적정가 비교',
     latestNews: 'AI 투자 핵심 분석',
     analystTarget: '증권사 목표주가',
+    analysisView: '분석형',
+    intuitiveView: '직관형',
+    surplusInterest: '이자보다 수혜 여유',
+    deficitInterest: '이자보다 수혜 부족',
+    recentViewed: '최근 본 종목',
+    noConsensusData: '데이터 없음',
 
     // Watchlist
     watchlistTitle: '관심 종목',
@@ -78,55 +90,61 @@ export const TRANSLATIONS = {
     emptyWatchlistDesc: '대시보드에서 분석하고자 하는 종목을 검색하고 별표를 눌러 관심 종목에 추가해 보세요.',
     goToSearch: '주식 검색하러 가기',
 
-       // Temperature details
-    tempFreezingLabel: '극심한 저평가 (혹한기 - 찬스)',
-    tempFreezingDesc: '역사적 저평가 영역으로, 과매도에 따른 중장기적 반등 잠재력이 높은 구간입니다.',
-    tempCoolLabel: '매력적 저평가 (쌀쌀함 - 기회)',
-    tempCoolDesc: '내재 가치 대비 매력적인 가격대로 판단되며, 점진적인 관심이 유효한 구간입니다.',
-    tempNormalLabel: '적정가 (쾌적함 - 안정)',
-    tempNormalDesc: '현재 주가가 기업의 내재 가치 영역에 부합하며, 안정적인 가격 흐름을 보이고 있습니다.',
-    tempWarmLabel: '고평가 (과열) (폭염 - 주의)',
-    tempWarmDesc: '단기적 과열 상태로 판단되며, 신규 진입 시 가격 변동성에 유의해야 합니다.',
-    tempHotLabel: '극단적 고평가 (용광로 - 위험)',
-    tempHotDesc: '시장 가치 대비 극단적인 고평가 영역으로, 신중한 리스크 관리가 필요합니다.',
+    // Temperature details
+    tempFreezingLabel: '극심한 저평가 (혹한기)',
+    tempFreezingDesc: '내재가치 및 역사적 밴드 대비 크게 낮게 평가된 구간입니다.',
+    tempCoolLabel: '저평가 구간 (쌀쌀함)',
+    tempCoolDesc: '수익 가치 대비 주가 배수가 낮게 형성되어 있는 상태입니다.',
+    tempNormalLabel: '적정 밸류 (적정온도)',
+    tempNormalDesc: '현재 주가가 기업의 내재 가치 지표에 부합하는 균형 구간입니다.',
+    tempWarmLabel: '고평가 구간 (과열)',
+    tempWarmDesc: '기업 실적 대비 주가 배수가 높게 형성되어 단기 변동성이 커질 수 있습니다.',
+    tempHotLabel: '극심한 고평가 (극단과열)',
+    tempHotDesc: '내재가치 대비 높은 프리미엄이 반영되어 있는 극단적 고평가 구간입니다.',
   },
   EN: {
     // Navigation
     dashboard: 'Dashboard',
     watchlist: 'Watchlist',
-    stocktemp: 'Stock Temp',
+    stocktemp: 'StockTemp',
 
     // Dashboard
-    heroTitle: 'What is the temperature of the market?',
-    heroDesc: 'StockTemp analyzes EPS, financial data, and real-time stock prices to show whether a stock is overheated or undervalued, using weather temperature (-10°C to 50°C) as the baseline.',
+    heroTitle: 'What is the current temperature of the market?',
+    heroDesc: 'StockTemp analyzes EPS, financial data, and market prices with AI to assess whether a stock is overvalued or undervalued, clearly visualized as a weather temperature (-10°C to 100°C).',
+    heroCommunityTitle: '100% Free & Community-Driven Platform',
+    heroCommunityDesc: 'When you add a stock, AI instantly analyzes its valuation status in real time. Feel free to register any stock, vote, and share your thoughts to gauge the true market temperature. (100% Free)',
+    heroBadgeFree: '100% Free',
+    heroBadgeAddStock: 'Register Stocks',
+    heroBadgeVote: 'Community Votes & Opinions',
     kospi: 'KOSPI 🇰🇷',
     kosdaq: 'KOSDAQ 🇰🇷',
     sp500: 'S&P 500 🇺🇸',
     nasdaq: 'NASDAQ 🇺🇸',
-    shanghai: 'Shanghai Composite 🇨🇳',
-    shenzhen: 'Shenzhen Component 🇨🇳',
-    hangseng: 'Hang Seng Index 🇭🇰',
+    shanghai: 'Shanghai 🇨🇳',
+    shenzhen: 'Shenzhen 🇨🇳',
+    hangseng: 'Hang Seng 🇭🇰',
     vnindex: 'VN-INDEX 🇻🇳',
     hnx: 'HNX Index 🇻🇳',
     nikkei: 'Nikkei 225 🇯🇵',
-    searchPlaceholder: 'Search by ticker, English name, or Korean name...',
+    searchPlaceholder: 'Search by ticker, English or Korean name...',
     searchResults: 'Search Results',
     searchEmpty: 'No stocks found. Please check your spelling.',
     coldestStocks: 'Undervalued Stocks',
     hottestStocks: 'Overvalued Stocks',
-    tempUnder20: 'Temp Below 20°C (Undervalued)',
-    tempOver20: 'Temp Above 20°C (Overvalued)',
-    emptyColdList: 'No undervalued stocks found or filtered.',
-    emptyHotList: 'No overvalued stocks found or filtered.',
+    tempUnder20: 'Temp under 20°C (Undervalued)',
+    tempOver20: 'Temp over 20°C (Overvalued)',
+    emptyColdList: 'No undervalued stocks found.',
+    emptyHotList: 'No overvalued stocks found.',
     currentPrice: 'Current Price',
     expectedReturn: 'Expected Return',
-    fairPrice: 'Fair Price',
+    fairPrice: 'Fair Value',
     industry: 'Industry',
     country: 'Country',
     all: 'All',
-    korea: 'Korea 🇰🇷',
-    usa: 'USA 🇺🇸',
-    vietnam: 'Vietnam 🇻🇳',
+    korea: 'Korea',
+    usa: 'USA',
+    vietnam: 'Vietnam',
+    china: 'China',
 
     // Stock Detail
     stockNotFound: 'Stock not found.',
@@ -135,23 +153,23 @@ export const TRANSLATIONS = {
     removeWatchlist: 'Saved',
     currentStockTemp: 'Current Stock Temperature',
     valuationCalc: 'Valuation & Simulation',
-    livePriceFeed: 'Live Price Feed',
+    livePriceFeed: 'Live Feed',
     targetPeSlider: 'Target P/E Multiple',
     conservative: 'Conservative (5x)',
     fair: 'Fair (15x)',
     aggressive: 'Aggressive (45x)',
-    priceSimulator: 'Price Simulator (Test)',
-    liveStreaming: 'Real-time Streaming',
-    tradingviewChart: 'TradingView Live Chart',
+    priceSimulator: 'Price Simulation',
+    liveStreaming: 'Live Streaming Data',
+    tradingviewChart: 'TradingView Real-Time Chart',
     eps: 'Earnings Per Share (EPS)',
     pe: 'P/E Ratio',
     roe: 'ROE',
     pbr: 'PBR',
     debtRatio: 'Debt Ratio',
-    investValueMultiplier: 'Investment Value Multiplier',
+    investValueMultiplier: 'Investment Multiplier',
     undervaluedText: 'Undervalued',
     overvaluedText: 'Overvalued',
-    relativeToCurrent: 'Relative to current',
+    relativeToCurrent: 'vs Current',
     times: 'x',
     baseInterestRate: 'Base Interest Rate',
     quarterlyRevenueEps: 'Quarterly Revenue & EPS',
@@ -159,25 +177,31 @@ export const TRANSLATIONS = {
     consensusVsFair: 'Target vs Fair Price',
     latestNews: 'AI Investment Analysis',
     analystTarget: 'Analyst Target Price',
+    analysisView: 'Analysis',
+    intuitiveView: 'Intuitive',
+    surplusInterest: 'Surplus over Interest',
+    deficitInterest: 'Deficit under Interest',
+    recentViewed: 'Recently Viewed',
+    noConsensusData: 'No Data',
 
     // Watchlist
     watchlistTitle: 'Watchlist',
-    watchlistDesc: 'Monitor real-time temperatures of your saved stocks in one place.',
+    watchlistDesc: 'Monitor real-time temperatures for your tracked stocks.',
     emptyWatchlist: 'Your watchlist is empty.',
-    emptyWatchlistDesc: 'Search for stocks on the dashboard and click the star icon to add them to your watchlist.',
+    emptyWatchlistDesc: 'Search for stocks on the dashboard and click the star to track them.',
     goToSearch: 'Search Stocks',
 
     // Temperature details
-    tempFreezingLabel: 'Deep Freeze (Extreme Undervaluation)',
-    tempFreezingDesc: 'An extremely undervalued zone with high potential for a medium-to-long-term rebound due to oversold conditions.',
-    tempCoolLabel: 'Chilly (Attractive Undervaluation)',
-    tempCoolDesc: 'Judged to be attractively priced relative to intrinsic value, representing a valid range for gradual interest.',
-    tempNormalLabel: 'Pleasant (Fair Value)',
-    tempNormalDesc: 'The current price aligns with the company\'s intrinsic value, showing a stable price trend.',
-    tempWarmLabel: 'Heatwave (Overvalued/Overheated)',
-    tempWarmDesc: 'Judged to be in a short-term overheated state; caution is advised regarding price volatility when entering new positions.',
-    tempHotLabel: 'Furnace (Extreme Overvaluation)',
-    tempHotDesc: 'An extremely overvalued zone relative to market value, requiring cautious risk management.',
+    tempFreezingLabel: 'Deep Undervalued (Freezing)',
+    tempFreezingDesc: 'Valuation multiples are significantly below historical and intrinsic baselines.',
+    tempCoolLabel: 'Undervalued (Chilly)',
+    tempCoolDesc: 'Trading at lower valuation multiples relative to underlying earnings metrics.',
+    tempNormalLabel: 'Fair Valuation (Moderate)',
+    tempNormalDesc: 'Current market price aligns with fundamental and intrinsic value indicators.',
+    tempWarmLabel: 'Overvalued (Warm)',
+    tempWarmDesc: 'Trading at elevated valuation multiples with higher potential for price volatility.',
+    tempHotLabel: 'Deep Overvalued (Furnace)',
+    tempHotDesc: 'Trading at significant premium multiples far exceeding historical valuation norms.',
   },
   VI: {
     // Navigation
@@ -187,7 +211,12 @@ export const TRANSLATIONS = {
 
     // Dashboard
     heroTitle: 'Nhiệt độ của thị trường hiện tại là bao nhiêu?',
-    heroDesc: 'StockTemp phân tích EPS, dữ liệu tài chính và giá cổ phiếu thời gian thực để hiển thị tình trạng quá nhiệt hoặc định giá thấp dựa trên nhiệt độ thời tiết (-10°C đến 50°C).',
+    heroDesc: 'StockTemp phân tích EPS, dữ liệu tài chính và giá thị trường bằng AI để đánh giá trạng thái định giá cao hay định giá thấp của cổ phiếu, hiển thị rõ ràng qua nhiệt độ thời tiết (-10°C đến 100°C).',
+    heroCommunityTitle: '100% Miễn phí & Nền tảng do cộng đồng xây dựng',
+    heroCommunityDesc: 'Khi bạn thêm mã cổ phiếu, AI sẽ phân tích tức thì trạng thái định giá theo thời gian thực. Hãy thoải mái đăng ký mã yêu thích, biểu quyết và chia sẻ nhận định để đo lường nhiệt độ thị trường. (100% Miễn phí)',
+    heroBadgeFree: '100% Miễn phí',
+    heroBadgeAddStock: 'Đăng ký mã cổ phiếu',
+    heroBadgeVote: 'Biểu quyết & Ý kiến cộng đồng',
     kospi: 'KOSPI 🇰🇷',
     kosdaq: 'KOSDAQ 🇰🇷',
     sp500: 'S&P 500 🇺🇸',
@@ -213,9 +242,10 @@ export const TRANSLATIONS = {
     industry: 'Ngành nghề',
     country: 'Quốc gia',
     all: 'Tất cả',
-    korea: 'Hàn Quốc 🇰🇷',
-    usa: 'Mỹ 🇺🇸',
-    vietnam: 'Việt Nam 🇻🇳',
+    korea: 'Hàn Quốc',
+    usa: 'Mỹ',
+    vietnam: 'Việt Nam',
+    china: 'Trung Quốc',
 
     // Stock Detail
     stockNotFound: 'Không tìm thấy mã cổ phiếu.',
@@ -248,6 +278,12 @@ export const TRANSLATIONS = {
     consensusVsFair: 'So sánh Giá mục tiêu & Hợp lý',
     latestNews: 'AI Phân tích Đầu tư',
     analystTarget: 'Giá mục tiêu của CTCK',
+    analysisView: 'Phân tích',
+    intuitiveView: 'Trực quan',
+    surplusInterest: 'Dư thừa so với lãi suất',
+    deficitInterest: 'Thiếu hụt so với lãi suất',
+    recentViewed: 'Đã xem gần đây',
+    noConsensusData: 'Không có dữ liệu',
 
     // Watchlist
     watchlistTitle: 'Danh sách theo dõi',
@@ -257,68 +293,666 @@ export const TRANSLATIONS = {
     goToSearch: 'Tìm kiếm cổ phiếu',
 
     // Temperature details
-    tempFreezingLabel: 'Đông lạnh (Định giá cực thấp)',
-    tempFreezingDesc: 'Vùng định giá cực thấp với tiềm năng phục hồi trung và dài hạn cao do tình trạng quá bán.',
-    tempCoolLabel: 'Se lạnh (Định giá hấp dẫn)',
-    tempCoolDesc: 'Được đánh giá là có mức giá hấp dẫn so với giá trị nội tại, phù hợp để tích lũy dần.',
-    tempNormalLabel: 'Dễ chịu (Giá hợp lý)',
-    tempNormalDesc: 'Mức giá hiện tại phù hợp với giá trị nội tại của doanh nghiệp, thể hiện xu hướng giá ổn định.',
-    tempWarmLabel: 'Nắng nóng (Định giá cao/Quá nhiệt)',
-    tempWarmDesc: 'Được đánh giá là tình trạng quá nhiệt trong ngắn hạn, cần lưu ý biến động giá khi tham gia vị thế mới.',
-    tempHotLabel: 'Lò lửa (Định giá cực cao)',
-    tempHotDesc: 'Vùng định giá cực cao so với giá trị thị trường, yêu cầu quản trị rủi ro thận trọng.',
+    tempFreezingLabel: 'Định giá rất thấp (Băng giá)',
+    tempFreezingDesc: 'Hệ số định giá thấp hơn đáng kể so với mức cơ sở lịch sử và giá trị nội tại.',
+    tempCoolLabel: 'Vùng định giá thấp (Se lạnh)',
+    tempCoolDesc: 'Giao dịch ở mức định giá thấp hơn so với các chỉ số thu nhập cơ bản.',
+    tempNormalLabel: 'Định giá hợp lý (Dễ chịu)',
+    tempNormalDesc: 'Mức giá thị trường hiện tại phù hợp với các chỉ số giá trị nội tại của doanh nghiệp.',
+    tempWarmLabel: 'Vùng định giá cao (Nóng ấm)',
+    tempWarmDesc: 'Giao dịch ở mức định giá cao so với kết quả kinh doanh, biến động giá có thể gia tăng.',
+    tempHotLabel: 'Định giá rất cao (Rất nóng)',
+    tempHotDesc: 'Mức giá phản ánh phần bù định giá rất cao so với các chỉ số tài chính cơ bản.',
   },
-}
+};
+
 export type TranslationKey = keyof typeof TRANSLATIONS.KO;
 
-export const translateIndustry = (industry: string): string => {
-  if (!industry) return '';
-  const mapping: Record<string, string> = {
-    '2차전지': 'Secondary Battery',
-    '2차전지소재': 'EV Battery Materials',
-    'IT소재및에너지': 'IT Materials & Energy',
-    'IT소재및화학': 'IT Materials & Chemicals',
-    'IT전자부품': 'IT Electronic Components',
-    '가전제품': 'Home Appliances',
-    '게임': 'Gaming',
-    '금융서비스': 'Financial Services',
-    '무선통신업': 'Telecommunications',
-    '반도체및반도체장비': 'Semiconductors & Equipment',
-    '방위산업': 'Defense',
-    '방위산업/항공': 'Defense & Aerospace',
-    '보험': 'Insurance',
-    '분자진단': 'Molecular Diagnostics',
-    '생활용품및화장품': 'Consumer Goods & Cosmetics',
-    '소비자서비스': 'Consumer Services',
-    '소프트웨어': 'Software',
-    '식음료': 'Food & Beverage',
-    '양방향미디어와서비스': 'Interactive Media & Services',
-    '엔터테인먼트': 'Entertainment',
-    '유통': 'Retail & Distribution',
-    '은행': 'Banking',
-    '의료기기': 'Medical Devices',
-    '의료기기및제약': 'Medical Devices & Pharma',
-    '자동차': 'Automotive',
-    '자동차부품': 'Auto Parts',
-    '재생의학/의료기기': 'Regenerative Medicine',
-    '전력기기': 'Electrical Equipment',
-    '전력기기및중공업': 'Electrical & Heavy Industry',
-    '정유': 'Oil & Gas',
-    '제약': 'Pharmaceuticals',
-    '제약/바이오': 'Pharmaceuticals & Biotech',
-    '조선': 'Shipbuilding',
-    '조선/중공업': 'Shipbuilding & Heavy Industry',
-    '종합상사및건설': 'Trading & Construction',
-    '중공업및친환경에너지': 'Heavy Industry & Green Energy',
-    '지주회사': 'Holding Company',
-    '철강및소재': 'Steel & Materials',
-    '철도및방위산업': 'Railways & Defense',
-    '친환경에너지': 'Green Energy',
-    '태양광및화학': 'Solar & Chemicals',
-    '화장품': 'Cosmetics',
-    '화장품유통': 'Cosmetics Distribution',
-    '화학': 'Chemicals',
-    '화학및친환경에너지': 'Chemicals & Green Energy',
+export const getCountryName = (country: string, lang: Language): string => {
+  const map: Record<string, Record<Language, string>> = {
+    KR: { KO: '대한민국 🇰🇷', EN: 'South Korea 🇰🇷', VI: 'Hàn Quốc 🇰🇷' },
+    US: { KO: '미국 🇺🇸', EN: 'USA 🇺🇸', VI: 'Mỹ 🇺🇸' },
+    VN: { KO: '베트남 🇻🇳', EN: 'Vietnam 🇻🇳', VI: 'Việt Nam 🇻🇳' },
+    CN: { KO: '중국 🇨🇳', EN: 'China 🇨🇳', VI: 'Trung Quốc 🇨🇳' },
   };
-  return mapping[industry] || industry;
+  return map[country]?.[lang] || map[country]?.['EN'] || country;
+};
+
+interface IndustryDict {
+  KO: string;
+  EN: string;
+  VI: string;
+}
+
+const INDUSTRY_MAP: Record<string, IndustryDict> = {
+  "Agriculture & Food": {
+    "KO": "농업 및 식품",
+    "EN": "Agriculture & Food",
+    "VI": "Nông nghiệp & Thực phẩm"
+  },
+  "Banking": {
+    "KO": "은행",
+    "EN": "Banking",
+    "VI": "Ngân hàng"
+  },
+  "Basic Materials": {
+    "KO": "기초 소재/원자재",
+    "EN": "Basic Materials",
+    "VI": "Nguyên vật liệu cơ bản"
+  },
+  "Beverage": {
+    "KO": "음료",
+    "EN": "Beverage",
+    "VI": "Đồ uống"
+  },
+  "Building Materials & Furniture": {
+    "KO": "건축자재 및 가구",
+    "EN": "Building Materials & Furniture",
+    "VI": "Vật liệu xây dựng & Nội thất"
+  },
+  "Chemicals": {
+    "KO": "화학",
+    "EN": "Chemicals",
+    "VI": "Hóa chất"
+  },
+  "Conglomerate & Agriculture": {
+    "KO": "복합기업 및 농업",
+    "EN": "Conglomerate & Agriculture",
+    "VI": "Tập đoàn & Nông nghiệp"
+  },
+  "Conglomerate & Real Estate": {
+    "KO": "복합기업 및 부동산",
+    "EN": "Conglomerate & Real Estate",
+    "VI": "Tập đoàn & Bất động sản"
+  },
+  "Consumer Cyclical": {
+    "KO": "경기소비재",
+    "EN": "Consumer Cyclical",
+    "VI": "Hàng tiêu dùng chu kỳ"
+  },
+  "Consumer Defensive": {
+    "KO": "필수소비재",
+    "EN": "Consumer Defensive",
+    "VI": "Hàng tiêu dùng thiết yếu"
+  },
+  "Consumer Goods": {
+    "KO": "소비재",
+    "EN": "Consumer Goods",
+    "VI": "Hàng tiêu dùng"
+  },
+  "Electrical Equipment": {
+    "KO": "전력기기",
+    "EN": "Electrical Equipment",
+    "VI": "Thiết bị điện"
+  },
+  "Energy & Oil": {
+    "KO": "에너지 및 정유",
+    "EN": "Energy & Oil",
+    "VI": "Năng lượng & Dầu khí"
+  },
+  "Energy Services": {
+    "KO": "에너지 서비스",
+    "EN": "Energy Services",
+    "VI": "Dịch vụ năng lượng"
+  },
+  "Financial Services": {
+    "KO": "금융 서비스",
+    "EN": "Financial Services",
+    "VI": "Dịch vụ tài chính"
+  },
+  "Food Processing": {
+    "KO": "식품 가공",
+    "EN": "Food Processing",
+    "VI": "Chế biến thực phẩm"
+  },
+  "IT & Brand Distribution": {
+    "KO": "IT 및 브랜드 유통",
+    "EN": "IT & Brand Distribution",
+    "VI": "Phân phối CNTT & Thương hiệu"
+  },
+  "IT Distribution": {
+    "KO": "IT 유통",
+    "EN": "IT Distribution",
+    "VI": "Phân phối CNTT"
+  },
+  "IT Services": {
+    "KO": "IT 서비스",
+    "EN": "IT Services",
+    "VI": "Dịch vụ CNTT"
+  },
+  "Industrial Real Estate": {
+    "KO": "산업단지 부동산",
+    "EN": "Industrial Real Estate",
+    "VI": "Bất động sản công nghiệp"
+  },
+  "Industrials": {
+    "KO": "산업재",
+    "EN": "Industrials",
+    "VI": "Công nghiệp"
+  },
+  "Logistics": {
+    "KO": "물류 및 운송",
+    "EN": "Logistics",
+    "VI": "Hậu cần & Logistics"
+  },
+  "Pharmaceuticals": {
+    "KO": "제약",
+    "EN": "Pharmaceuticals",
+    "VI": "Dược phẩm"
+  },
+  "Real Estate": {
+    "KO": "부동산",
+    "EN": "Real Estate",
+    "VI": "Bất động sản"
+  },
+  "Retail": {
+    "KO": "소비재 유통",
+    "EN": "Retail",
+    "VI": "Bán lẻ"
+  },
+  "Steel & Materials": {
+    "KO": "철강 및 소재",
+    "EN": "Steel & Materials",
+    "VI": "Thép & Vật liệu"
+  },
+  "Telecommunications Infrastructure": {
+    "KO": "통신 인프라",
+    "EN": "Telecommunications Infrastructure",
+    "VI": "Hạ tầng viễn thông"
+  },
+  "Transportation & Aviation": {
+    "KO": "항공 및 운송",
+    "EN": "Transportation & Aviation",
+    "VI": "Vận tải & Hàng không"
+  },
+  "Utilities": {
+    "KO": "유틸리티/전력",
+    "EN": "Utilities",
+    "VI": "Tiện ích & Năng lượng"
+  },
+  "Utilities & EPC": {
+    "KO": "유틸리티 및 EPC",
+    "EN": "Utilities & EPC",
+    "VI": "Tiện ích & Xây lắp EPC"
+  },
+  "Utilities & Gas": {
+    "KO": "가스 및 유틸리티",
+    "EN": "Utilities & Gas",
+    "VI": "Tiện ích & Khí đốt"
+  },
+  "Utilities & M&E": {
+    "KO": "기계전기 및 유틸리티",
+    "EN": "Utilities & M&E",
+    "VI": "Tiện ích & Cơ điện M&E"
+  },
+  "Utilities & Real Estate": {
+    "KO": "유틸리티 및 부동산",
+    "EN": "Utilities & Real Estate",
+    "VI": "Tiện ích & Bất động sản"
+  },
+  "Aerospace": {
+    "KO": "항공우주",
+    "EN": "Aerospace",
+    "VI": "Hàng không vũ trụ"
+  },
+  "Aerospace & Defense": {
+    "KO": "항공우주 및 방위산업",
+    "EN": "Aerospace & Defense",
+    "VI": "Hàng không vũ trụ & Quốc phòng"
+  },
+  "Apparel": {
+    "KO": "의류 및 패션",
+    "EN": "Apparel",
+    "VI": "May mặc & Thời trang"
+  },
+  "Asset Management": {
+    "KO": "자산운용",
+    "EN": "Asset Management",
+    "VI": "Quản lý tài sản"
+  },
+  "Automotive": {
+    "KO": "자동차",
+    "EN": "Automotive",
+    "VI": "Ô tô & Xe máy"
+  },
+  "Biotechnology": {
+    "KO": "바이오기술",
+    "EN": "Biotechnology",
+    "VI": "Công nghệ sinh học"
+  },
+  "Communication Services": {
+    "KO": "커뮤니케이션 서비스",
+    "EN": "Communication Services",
+    "VI": "Dịch vụ truyền thông"
+  },
+  "Computer Hardware": {
+    "KO": "컴퓨터 하드웨어",
+    "EN": "Computer Hardware",
+    "VI": "Phần cứng máy tính"
+  },
+  "Computer Networking": {
+    "KO": "컴퓨터 네트워크",
+    "EN": "Computer Networking",
+    "VI": "Mạng máy tính"
+  },
+  "Conglomerate": {
+    "KO": "복합 대기업",
+    "EN": "Conglomerate",
+    "VI": "Tập đoàn đa ngành"
+  },
+  "Consumer Services": {
+    "KO": "소비자 서비스",
+    "EN": "Consumer Services",
+    "VI": "Dịch vụ tiêu dùng"
+  },
+  "Defense & Tech": {
+    "KO": "방산 및 첨단기술",
+    "EN": "Defense & Tech",
+    "VI": "Quốc phòng & Công nghệ"
+  },
+  "Energy": {
+    "KO": "에너지",
+    "EN": "Energy",
+    "VI": "Năng lượng"
+  },
+  "Energy & Materials": {
+    "KO": "에너지 및 소재",
+    "EN": "Energy & Materials",
+    "VI": "Năng lượng & Vật liệu"
+  },
+  "Entertainment": {
+    "KO": "엔터테인먼트",
+    "EN": "Entertainment",
+    "VI": "Giải trí"
+  },
+  "EV & New Energy": {
+    "KO": "전기차 및 신에너지",
+    "EN": "EV & New Energy",
+    "VI": "Xe điện & Năng lượng mới"
+  },
+  "Financials": {
+    "KO": "금융",
+    "EN": "Financials",
+    "VI": "Tài chính"
+  },
+  "General": {
+    "KO": "일반",
+    "EN": "General",
+    "VI": "Tổng hợp"
+  },
+  "Healthcare": {
+    "KO": "헬스케어/의료",
+    "EN": "Healthcare",
+    "VI": "Chăm sóc sức khỏe"
+  },
+  "Healthcare Equipment": {
+    "KO": "의료 장비",
+    "EN": "Healthcare Equipment",
+    "VI": "Thiết bị y tế"
+  },
+  "Healthcare Services": {
+    "KO": "의료 서비스",
+    "EN": "Healthcare Services",
+    "VI": "Dịch vụ y tế"
+  },
+  "Insurance": {
+    "KO": "보험",
+    "EN": "Insurance",
+    "VI": "Bảo hiểm"
+  },
+  "Internet & Services": {
+    "KO": "인터넷 서비스",
+    "EN": "Internet & Services",
+    "VI": "Dịch vụ Internet"
+  },
+  "Internet & Travel": {
+    "KO": "인터넷 및 여행",
+    "EN": "Internet & Travel",
+    "VI": "Internet & Du lịch"
+  },
+  "Machinery": {
+    "KO": "기계 및 장비",
+    "EN": "Machinery",
+    "VI": "Máy móc & Thiết bị"
+  },
+  "Restaurants": {
+    "KO": "외식업",
+    "EN": "Restaurants",
+    "VI": "Nhà hàng & Dịch vụ ăn uống"
+  },
+  "Restaurants & Retail": {
+    "KO": "외식 및 유통",
+    "EN": "Restaurants & Retail",
+    "VI": "Nhà hàng & Bán lẻ"
+  },
+  "Retail & E-commerce": {
+    "KO": "이커머스 및 유통",
+    "EN": "Retail & E-commerce",
+    "VI": "Bán lẻ & Thương mại điện tử"
+  },
+  "Retail & Services": {
+    "KO": "소매 및 서비스",
+    "EN": "Retail & Services",
+    "VI": "Bán lẻ & Dịch vụ"
+  },
+  "Semiconductors": {
+    "KO": "반도체",
+    "EN": "Semiconductors",
+    "VI": "Bán dẫn"
+  },
+  "Semiconductors & ADAS": {
+    "KO": "반도체 및 자율주행",
+    "EN": "Semiconductors & ADAS",
+    "VI": "Bán dẫn & Lái xe tự động"
+  },
+  "Semiconductors & Healthcare": {
+    "KO": "반도체 및 헬스케어",
+    "EN": "Semiconductors & Healthcare",
+    "VI": "Bán dẫn & Y tế"
+  },
+  "Social Media": {
+    "KO": "소셜 미디어",
+    "EN": "Social Media",
+    "VI": "Mạng xã hội"
+  },
+  "Software": {
+    "KO": "소프트웨어",
+    "EN": "Software",
+    "VI": "Phần mềm"
+  },
+  "Software & Finance": {
+    "KO": "금융 소프트웨어",
+    "EN": "Software & Finance",
+    "VI": "Phần mềm tài chính"
+  },
+  "Solar Energy": {
+    "KO": "태양광 에너지",
+    "EN": "Solar Energy",
+    "VI": "Năng lượng mặt trời"
+  },
+  "Tech & Internet": {
+    "KO": "기술 및 인터넷",
+    "EN": "Tech & Internet",
+    "VI": "Công nghệ & Internet"
+  },
+  "Technology": {
+    "KO": "정보기술(IT)",
+    "EN": "Technology",
+    "VI": "Công nghệ thông tin"
+  },
+  "Technology Hardware": {
+    "KO": "IT 하드웨어",
+    "EN": "Technology Hardware",
+    "VI": "Phần cứng công nghệ"
+  },
+  "Telecommunications": {
+    "KO": "통신",
+    "EN": "Telecommunications",
+    "VI": "Viễn thông"
+  },
+  "Tobacco": {
+    "KO": "담배/기호품",
+    "EN": "Tobacco",
+    "VI": "Thuốc lá & Tiêu dùng"
+  },
+  "Transportation": {
+    "KO": "운송",
+    "EN": "Transportation",
+    "VI": "Vận tải"
+  },
+  "Transportation & Services": {
+    "KO": "운송 및 서비스",
+    "EN": "Transportation & Services",
+    "VI": "Vận tải & Dịch vụ"
+  },
+  "2차전지": {
+    "KO": "2차전지/배터리",
+    "EN": "EV Battery",
+    "VI": "Pin & Năng lượng mới"
+  },
+  "2차전지소재": {
+    "KO": "2차전지소재",
+    "EN": "EV Battery Materials",
+    "VI": "Vật liệu Pin xe điện"
+  },
+  "IT소재및에너지": {
+    "KO": "IT 소재 및 에너지",
+    "EN": "IT Materials & Energy",
+    "VI": "Vật liệu CNTT & Năng lượng"
+  },
+  "IT소재및화학": {
+    "KO": "IT 소재 및 화학",
+    "EN": "IT Materials & Chemicals",
+    "VI": "Vật liệu CNTT & Hóa chất"
+  },
+  "IT전자부품": {
+    "KO": "IT 전자부품",
+    "EN": "IT Electronic Components",
+    "VI": "Linh kiện điện tử"
+  },
+  "가전제품": {
+    "KO": "가전제품",
+    "EN": "Home Appliances",
+    "VI": "Thiết bị gia dụng"
+  },
+  "게임": {
+    "KO": "게임",
+    "EN": "Gaming",
+    "VI": "Trò chơi điện tử"
+  },
+  "금융서비스": {
+    "KO": "금융 서비스",
+    "EN": "Financial Services",
+    "VI": "Dịch vụ tài chính"
+  },
+  "무선통신업": {
+    "KO": "무선통신",
+    "EN": "Wireless Telecom",
+    "VI": "Viễn thông không dây"
+  },
+  "반도체및반도체장비": {
+    "KO": "반도체및반도체장비",
+    "EN": "Semiconductors & Equipment",
+    "VI": "Bán dẫn & Thiết bị"
+  },
+  "방위산업": {
+    "KO": "방위산업",
+    "EN": "Defense",
+    "VI": "Quốc phòng"
+  },
+  "방위산업/항공": {
+    "KO": "방위산업/항공",
+    "EN": "Defense & Aerospace",
+    "VI": "Quốc phòng & Hàng không"
+  },
+  "보험": {
+    "KO": "보험",
+    "EN": "Insurance",
+    "VI": "Bảo hiểm"
+  },
+  "분자진단": {
+    "KO": "분자진단",
+    "EN": "Molecular Diagnostics",
+    "VI": "Chẩn đoán phân tử"
+  },
+  "생활용품및화장품": {
+    "KO": "생활용품 및 화장품",
+    "EN": "Consumer Goods & Cosmetics",
+    "VI": "Hàng tiêu dùng & Mỹ phẩm"
+  },
+  "소비자서비스": {
+    "KO": "소비자 서비스",
+    "EN": "Consumer Services",
+    "VI": "Dịch vụ tiêu dùng"
+  },
+  "소프트웨어": {
+    "KO": "소프트웨어",
+    "EN": "Software",
+    "VI": "Phần mềm"
+  },
+  "식음료": {
+    "KO": "식음료",
+    "EN": "Food & Beverage",
+    "VI": "Thực phẩm & Đồ uống"
+  },
+  "양방향미디어와서비스": {
+    "KO": "인터넷/플랫폼",
+    "EN": "Interactive Media & Services",
+    "VI": "Truyền thông & Dịch vụ số"
+  },
+  "엔터테인먼트": {
+    "KO": "엔터테인먼트",
+    "EN": "Entertainment",
+    "VI": "Giải trí"
+  },
+  "유통": {
+    "KO": "유통",
+    "EN": "Retail & Distribution",
+    "VI": "Bán lẻ & Phân phối"
+  },
+  "은행": {
+    "KO": "은행",
+    "EN": "Banking",
+    "VI": "Ngân hàng"
+  },
+  "의료기기": {
+    "KO": "의료기기",
+    "EN": "Medical Devices",
+    "VI": "Thiết bị y tế"
+  },
+  "의료기기및제약": {
+    "KO": "의료기기 및 제약",
+    "EN": "Medical Devices & Pharma",
+    "VI": "Thiết bị y tế & Dược"
+  },
+  "자동차": {
+    "KO": "자동차",
+    "EN": "Automotive",
+    "VI": "Ô tô & Xe máy"
+  },
+  "자동차부품": {
+    "KO": "자동차부품",
+    "EN": "Auto Parts",
+    "VI": "Phụ tùng ô tô"
+  },
+  "재생의학/의료기기": {
+    "KO": "재생의학/의료기기",
+    "EN": "Regenerative Medicine",
+    "VI": "Y học tái tạo"
+  },
+  "전력기기": {
+    "KO": "전력기기",
+    "EN": "Electrical Equipment",
+    "VI": "Thiết bị điện"
+  },
+  "전력기기및중공업": {
+    "KO": "전력기기 및 중공업",
+    "EN": "Electrical & Heavy Industry",
+    "VI": "Thiết bị điện & Công nghiệp nặng"
+  },
+  "정유": {
+    "KO": "정유/석유화학",
+    "EN": "Oil & Gas",
+    "VI": "Dầu khí"
+  },
+  "제약": {
+    "KO": "제약",
+    "EN": "Pharmaceuticals",
+    "VI": "Dược phẩm"
+  },
+  "제약/바이오": {
+    "KO": "제약/바이오",
+    "EN": "Pharmaceuticals & Biotech",
+    "VI": "Dược phẩm & Sinh học"
+  },
+  "조선": {
+    "KO": "조선",
+    "EN": "Shipbuilding",
+    "VI": "Đóng tàu"
+  },
+  "조선/중공업": {
+    "KO": "조선/중공업",
+    "EN": "Shipbuilding & Heavy Industry",
+    "VI": "Đóng tàu & Cơ khí nặng"
+  },
+  "종합상사및건설": {
+    "KO": "종합상사 및 건설",
+    "EN": "Trading & Construction",
+    "VI": "Thương mại & Xây dựng"
+  },
+  "중공업및친환경에너지": {
+    "KO": "중공업 및 친환경에너지",
+    "EN": "Heavy Industry & Green Energy",
+    "VI": "Công nghiệp nặng & Năng lượng xanh"
+  },
+  "지주회사": {
+    "KO": "지주회사",
+    "EN": "Holding Company",
+    "VI": "Công ty cổ phần đầu tư"
+  },
+  "철강및소재": {
+    "KO": "철강 및 소재",
+    "EN": "Steel & Materials",
+    "VI": "Thép & Vật liệu"
+  },
+  "철도및방위산업": {
+    "KO": "철도 및 방위산업",
+    "EN": "Railways & Defense",
+    "VI": "Đường sắt & Quốc phòng"
+  },
+  "친환경에너지": {
+    "KO": "친환경 에너지",
+    "EN": "Green Energy",
+    "VI": "Năng lượng xanh"
+  },
+  "태양광및화학": {
+    "KO": "태양광 및 화학",
+    "EN": "Solar & Chemicals",
+    "VI": "Năng lượng mặt trời & Hóa chất"
+  },
+  "화장품": {
+    "KO": "화장품/뷰티",
+    "EN": "Cosmetics",
+    "VI": "Mỹ phẩm"
+  },
+  "화장품유통": {
+    "KO": "화장품 유통",
+    "EN": "Cosmetics Distribution",
+    "VI": "Phân phối mỹ phẩm"
+  },
+  "화학": {
+    "KO": "화학",
+    "EN": "Chemicals",
+    "VI": "Hóa chất"
+  },
+  "화학및친환경에너지": {
+    "KO": "화학 및 친환경에너지",
+    "EN": "Chemicals & Green Energy",
+    "VI": "Hóa chất & Năng lượng xanh"
+  }
+};
+
+// Lookup helper supporting exact match and normalized lowercase match
+const NORMALIZED_INDUSTRY_MAP: Record<string, IndustryDict> = {};
+for (const [key, val] of Object.entries(INDUSTRY_MAP)) {
+  NORMALIZED_INDUSTRY_MAP[key.toLowerCase().trim()] = val;
+}
+
+export const translateIndustry = (industry: string, lang: Language = 'KO'): string => {
+  if (!industry) return '';
+  const trimmed = industry.trim();
+  
+  // 1. Direct match
+  if (INDUSTRY_MAP[trimmed]) {
+    return INDUSTRY_MAP[trimmed][lang] || INDUSTRY_MAP[trimmed]['EN'] || trimmed;
+  }
+  
+  // 2. Normalized lower-case match
+  const lower = trimmed.toLowerCase();
+  if (NORMALIZED_INDUSTRY_MAP[lower]) {
+    return NORMALIZED_INDUSTRY_MAP[lower][lang] || NORMALIZED_INDUSTRY_MAP[lower]['EN'] || trimmed;
+  }
+  
+  // 3. Fallback: return original string
+  return trimmed;
 };

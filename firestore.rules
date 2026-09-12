@@ -1,9 +1,96 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Helper function to check if user is logged in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     match /stocks/{stockId} {
-      allow read, create: if true;
-      allow update, delete: if false;
+      // Anyone can read stocks (since it's a public dashboard)
+      allow read: if true;
+      
+      // Allow stock registration
+      allow create: if isSignedIn() 
+        && request.resource.data.ticker is string
+        && request.resource.data.name is string
+        && request.resource.data.country in ['KR', 'US', 'VN', 'CN'];
+
+      // Allow updating recommendationCount/dislikeCount, AI analysis reports caching, or creator modifications
+      allow update: if 
+        // Case 1: AI analysis reports caching or voting
+        request.resource.data.diff(resource.data).affectedKeys().hasAny(['latestNews_KO', 'latestNews_EN', 'latestNews_VI', 'aiAnalyzedAt', 'recommendationCount', 'dislikeCount', 'currentPrice', 'eps', 'per', 'bps'])
+        ||
+        (isSignedIn() && resource.data.createdBy == request.auth.uid);
+      
+      allow delete: if false; // Deletion is not allowed by clients
+    }
+    
+    match /recommendations/{recId} {
+      // recId format is {uid}_{stockId}
+      allow read: if true;
+      
+      // Create a recommendation: must be signed in, matching request.auth.uid
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.stockId is string
+        && request.resource.data.type in ['up', 'down']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 200
+        && recId == request.auth.uid + '_' + request.resource.data.stockId;
+
+      // Update recommendation: only allow updating 'type' and 'reason' by the owner
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.stockId == resource.data.stockId
+        && request.resource.data.type in ['up', 'down']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 200;
+
+      // Delete recommendation: only the owner can delete
+      allow delete: if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+
+      // Subcollection for replies (comment on comment)
+      match /replies/{replyId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.content is string
+          && request.resource.data.content.size() <= 200;
+        allow update, delete: if isSignedIn()
+          && resource.data.uid == request.auth.uid;
+      }
+    }
+
+    // Community Discussions (Free discussion comments for any stock)
+    match /discussions/{discussionId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.stockId is string
+        && request.resource.data.content is string
+        && request.resource.data.content.size() <= 500;
+      allow update, delete: if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+
+      match /replies/{replyId} {
+        allow read: if true;
+        allow create: if isSignedIn()
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.content is string
+          && request.resource.data.content.size() <= 200;
+        allow update, delete: if isSignedIn()
+          && resource.data.uid == request.auth.uid;
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update: if isSignedIn() && userId == request.auth.uid;
+      allow delete: if false;
     }
   }
 }

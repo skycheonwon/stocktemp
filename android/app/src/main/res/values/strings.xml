@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">StockTemp</string>
+    <string name="title_activity_main">StockTemp</string>
+    <string name="package_name">com.templock.stocktemp</string>
+    <string name="custom_url_scheme">com.templock.stocktemp</string>
+</resources>

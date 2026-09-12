@@ -13,10 +13,34 @@ export function calculateExpectedReturn(pe: number): number {
 
 /**
  * Calculates the Fair Price (적정가)
- * fairPrice = EPS * Target P/E Multiplier
+ * 1. If EPS > 0: fairPrice = EPS * Target P/E Multiplier
+ * 2. If EPS <= 0 (Deficit) and BPS > 0: fairPrice = BPS * Target PBR (1.5x)
+ * 3. If BPS not directly available, derive from (currentPrice / pbr)
  */
-export function calculateFairPrice(eps: number, targetPe: number): number {
-  return Number((eps * targetPe).toFixed(2))
+export function calculateFairPrice(
+  eps: number,
+  targetPe: number,
+  bps?: number,
+  pbr?: number,
+  currentPrice?: number
+): number {
+  if (eps > 0) {
+    return Number((eps * targetPe).toFixed(2))
+  }
+
+  // EPS <= 0 (적자 기업 대체 밸류에이션: BPS 순자산가치 기준)
+  let effectiveBps = bps && bps > 0 ? bps : 0
+  if (!effectiveBps && pbr && pbr > 0 && currentPrice && currentPrice > 0) {
+    effectiveBps = currentPrice / pbr
+  }
+
+  if (effectiveBps > 0) {
+    // 바이오/성장 적자 기업의 표준 자산 배수 1.5x 적용
+    const targetPbr = 1.5
+    return Number((effectiveBps * targetPbr).toFixed(2))
+  }
+
+  return 0
 }
 
 /**
@@ -24,16 +48,21 @@ export function calculateFairPrice(eps: number, targetPe: number): number {
  * investmentValue = Fair Price / Current Price
  */
 export function calculateInvestmentValue(fairPrice: number, currentPrice: number): number {
-  if (currentPrice <= 0) return 0
+  if (currentPrice <= 0 || fairPrice <= 0) return 0
   return Number((fairPrice / currentPrice).toFixed(2))
 }
 
 /**
  * Calculates the Stock Temperature in Celsius (°C)
  * Temp = 30 * (Current Price / Fair Price) - 10
+ * If fairPrice is 0 (Unvalued deficit / capital impairment): returns 100.0°C (Extreme Overvalued / High Risk)
  */
 export function calculateStockTemperature(currentPrice: number, fairPrice: number): number {
-  if (fairPrice <= 0 || currentPrice <= 0) return 20.0
+  if (currentPrice <= 0) return 20.0
+  if (fairPrice <= 0) {
+    // 완전 자본잠식 또는 산출 불가 적자 기업 -> 최고 온도(100°C) 처리
+    return 100.0
+  }
   const temp = 30 * (currentPrice / fairPrice) - 10
   // Clamp values between -30°C and 100°C for sensible UI displays
   return Number(Math.max(-30, Math.min(100, temp)).toFixed(1))
@@ -54,47 +83,47 @@ export interface TemperatureState {
 export function getTemperatureDetails(temp: number): TemperatureState {
   if (temp < 0) {
     return {
-      label: '혹한기 (극심한 저평가)',
+      label: '극심한 저평가 (혹한기)',
       colorClass: 'text-blue-400',
       badgeColorClass: 'bg-blue-950/80 text-blue-300 border-blue-900/50',
       gradientClass: 'from-blue-500 to-cyan-500',
-      description: '얼어붙었지만 대세 상승의 씨앗이 되는 기회입니다.',
+      description: '내재가치 및 역사적 밴드 대비 크게 낮게 평가된 구간입니다.',
       iconName: 'snowflake',
     }
   } else if (temp < 15) {
     return {
-      label: '쌀쌀함 (매력적 저평가)',
+      label: '저평가 구간 (쌀쌀함)',
       colorClass: 'text-cyan-400',
       badgeColorClass: 'bg-cyan-950/80 text-cyan-300 border-cyan-900/50',
       gradientClass: 'from-cyan-500 to-teal-500',
-      description: '쇼핑하기 딱 좋은 날씨입니다. 담아볼까요?',
+      description: '수익 가치 대비 주가 배수가 낮게 형성되어 있는 상태입니다.',
       iconName: 'wind',
     }
-  } else if (temp <= 25) {
+  } else if (temp < 35) {
     return {
-      label: '쾌적함 (적정가)',
+      label: '적정 밸류 (적정온도)',
       colorClass: 'text-emerald-400',
       badgeColorClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-900/50',
       gradientClass: 'from-emerald-500 to-green-500',
-      description: '가치와 가격이 일치합니다. 편안하게 보유하세요.',
+      description: '현재 주가가 기업의 내재 가치 지표에 부합하는 균형 구간입니다.',
       iconName: 'cloud-sun',
     }
-  } else if (temp <= 45) {
+  } else if (temp < 50) {
     return {
-      label: '폭염 (고평가/과열)',
+      label: '고평가 구간 (과열)',
       colorClass: 'text-amber-400',
       badgeColorClass: 'bg-amber-950/80 text-amber-300 border-amber-900/50',
       gradientClass: 'from-amber-500 to-orange-500',
-      description: '열기가 가득합니다. 신규 매수는 자제하세요.',
+      description: '기업 실적 대비 주가 배수가 높게 형성되어 단기 변동성이 커질 수 있습니다.',
       iconName: 'sun',
     }
   } else {
     return {
-      label: '용광로 (극단적 고평가)',
+      label: '극심한 고평가 (극단과열)',
       colorClass: 'text-rose-500',
       badgeColorClass: 'bg-rose-950/80 text-rose-300 border-rose-900/50',
       gradientClass: 'from-orange-500 to-rose-500',
-      description: '너무 뜨겁습니다! 익절하고 대피하세요.',
+      description: '내재가치 대비 높은 프리미엄이 반영되어 있는 극단적 고평가 구간입니다.',
       iconName: 'flame',
     }
   }

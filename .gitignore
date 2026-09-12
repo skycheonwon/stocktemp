@@ -28,4 +28,9 @@ scripts/service-account.json
 __pycache__/
 .pytest_cache/
 .github/workflows/*.py
+.firebase/
 
+# Environment files
+.env
+.env.*
+!.env.example

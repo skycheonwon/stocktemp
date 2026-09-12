@@ -60,14 +60,15 @@ def get_fallback_shares(ticker, country):
     return 100_000_000
 
 def get_yahoo_ticker(ticker, country, naver_ticker):
+    naver_ticker = naver_ticker or ''
     if country == "KR":
         return f"{ticker}.KS"
     elif country == "US":
-        return naver_ticker.split('.')[0] if '.' in naver_ticker else naver_ticker
+        return naver_ticker.split('.')[0] if '.' in naver_ticker else (naver_ticker or ticker)
     elif country == "VN":
         return f"{ticker}.VN"
     elif country == "CN":
-        return naver_ticker
+        return naver_ticker or ticker
     return ticker
 
 def fetch_quarterly_financials(yahoo_ticker, ticker, country):

@@ -1,26 +1,105 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Star, TrendingUp, Zap } from 'lucide-react'
-import { COUNTRY_NAMES } from '../data/mockStocks'
-import { translateIndustry } from '../data/translations'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { 
+  ArrowLeft, Star, Zap, ThumbsUp, ThumbsDown, MessageSquare, 
+  Trash2, Calendar, User, LogIn, ChevronDown, ChevronUp, Sparkles, Send, Info,
+  TrendingUp, TrendingDown 
+} from 'lucide-react'
+import { 
+  doc, runTransaction, collection, query, where, onSnapshot, 
+  serverTimestamp, addDoc, deleteDoc, updateDoc, increment 
+} from 'firebase/firestore'
+import { db } from '../firebase'
+import { translateIndustry, getCountryName } from '../data/translations'
 import { useLanguage } from '../context/LanguageContext'
 import { useLivePrices } from '../context/LivePriceContext'
+import { useAuth } from '../context/AuthContext'
+import { generateAndSaveStockAnalysis } from '../utils/geminiAnalysis'
 import {
   calculateFairPrice,
   calculateExpectedReturn,
   calculateStockTemperature,
 } from '../utils/valuation'
 import { WeatherIcon } from '../components/WeatherIcon'
+import LoginInline from '../components/LoginInline'
+import OpinionReplies from '../components/OpinionReplies'
 
 export default function StockDetail() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { stocks, prices, eps, loading } = useLivePrices()
   const stock = stocks.find((s) => s.id === id)
   const { t, language } = useLanguage()
+  const { user } = useAuth()
 
   // State
   const [isSaved, setIsSaved] = useState<boolean>(false)
   const [expandedNewsIndex, setExpandedNewsIndex] = useState<number | null>(null)
+  const [dynamicAiReports, setDynamicAiReports] = useState<any>(null)
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false)
+  
+  // One-Click Voting States
+  const [isDetailLoginOpen, setIsDetailLoginOpen] = useState(false)
+  const [myVote, setMyVote] = useState<any>(null)
+  const [votingLoading, setVotingLoading] = useState(false)
+
+  // Free Discussion Community States
+  const [discussions, setDiscussions] = useState<any[]>([])
+  const [discussionContent, setDiscussionContent] = useState('')
+  const [discussionSubmitting, setDiscussionSubmitting] = useState(false)
+
+  // Scroll to top immediately when viewing a stock
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior })
+  }, [id])
+
+  // Track last viewed and recently viewed stocks
+  useEffect(() => {
+    if (!stock) return
+    try {
+      sessionStorage.setItem('stocktemp_last_viewed', stock.id)
+      
+      const savedRecents = localStorage.getItem('stocktemp_recent_stocks')
+      let recents: any[] = savedRecents ? JSON.parse(savedRecents) : []
+      recents = recents.filter(item => item.id !== stock.id)
+      recents.unshift({
+        id: stock.id,
+        ticker: stock.ticker,
+        name: stock.name,
+        koreanName: stock.koreanName,
+        country: stock.country,
+        industry: stock.industry,
+        viewedAt: Date.now()
+      })
+      localStorage.setItem('stocktemp_recent_stocks', JSON.stringify(recents.slice(0, 10)))
+    } catch (e) {
+      console.error('Error saving recent stock:', e)
+    }
+  }, [stock?.id])
+
+  // Trigger On-demand Gemini AI Analysis if stock has no cached analysis
+  useEffect(() => {
+    if (!stock) return
+    const hasAiReports = Boolean(
+      (stock.latestNews_KO && stock.latestNews_KO.length > 0) ||
+      (stock.latestNews_EN && stock.latestNews_EN.length > 0) ||
+      (stock.latestNews_VI && stock.latestNews_VI.length > 0)
+    )
+
+    if (!hasAiReports && !isGeneratingAi && !dynamicAiReports) {
+      setIsGeneratingAi(true)
+      generateAndSaveStockAnalysis(stock)
+        .then((res) => {
+          if (res) {
+            setDynamicAiReports(res)
+          }
+          setIsGeneratingAi(false)
+        })
+        .catch(() => {
+          setIsGeneratingAi(false)
+        })
+    }
+  }, [stock?.id])
 
   // Watchlist LocalStorage sync
   useEffect(() => {
@@ -31,6 +110,201 @@ export default function StockDetail() {
       setIsSaved(watchlist.includes(stock.id))
     }
   }, [stock])
+
+  // 1. Subscribe to user's vote status for this stock
+  useEffect(() => {
+    if (!id || !user) {
+      setMyVote(null)
+      return
+    }
+    const recDocId = `${user.uid}_${id}`
+    const unsubscribe = onSnapshot(doc(db, 'recommendations', recDocId), (docSnap) => {
+      if (docSnap.exists()) {
+        setMyVote({ id: docSnap.id, ...docSnap.data() })
+      } else {
+        setMyVote(null)
+      }
+    }, (err) => {
+      console.error('Error listening to my vote:', err)
+    })
+    return () => unsubscribe()
+  }, [id, user])
+
+  // 2. Subscribe to real-time community discussions for this stock
+  useEffect(() => {
+    if (!id) return
+    const q = query(
+      collection(db, 'discussions'),
+      where('stockId', '==', id)
+    )
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const list: any[] = []
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() })
+      })
+      // Client-side sort by createdAt desc to eliminate composite index requirement
+      list.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0)
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0)
+        return timeB - timeA
+      })
+      setDiscussions(list)
+    }, (error) => {
+      console.error('Error listening to discussions:', error)
+    })
+    return () => unsubscribe()
+  }, [id])
+
+  // One-click Toggle Vote (UP or DOWN)
+  const handleVoteToggle = async (targetType: 'up' | 'down') => {
+    if (!user) {
+      setIsDetailLoginOpen(true)
+      return
+    }
+    if (!id || !stock || votingLoading) return
+
+    setVotingLoading(true)
+    const recDocId = `${user.uid}_${id}`
+    const recRef = doc(db, 'recommendations', recDocId)
+    const stockRef = doc(db, 'stocks', id)
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const stockSnapshot = await transaction.get(stockRef)
+        const recSnapshot = await transaction.get(recRef)
+
+        const currentStockData = stockSnapshot.exists() ? stockSnapshot.data() : null
+        const recCount = currentStockData?.recommendationCount || 0
+        const disCount = currentStockData?.dislikeCount || 0
+
+        if (recSnapshot.exists()) {
+          const currentRec = recSnapshot.data()
+          if (currentRec.type === targetType) {
+            // Cancel vote
+            transaction.delete(recRef)
+            if (stockSnapshot.exists()) {
+              if (targetType === 'up') {
+                transaction.update(stockRef, { recommendationCount: Math.max(0, recCount - 1) })
+              } else {
+                transaction.update(stockRef, { dislikeCount: Math.max(0, disCount - 1) })
+              }
+            }
+          } else {
+            // Change vote from up -> down or down -> up
+            transaction.update(recRef, { type: targetType, updatedAt: serverTimestamp() })
+            if (stockSnapshot.exists()) {
+              if (targetType === 'up') {
+                transaction.update(stockRef, { 
+                  recommendationCount: recCount + 1,
+                  dislikeCount: Math.max(0, disCount - 1)
+                })
+              } else {
+                transaction.update(stockRef, { 
+                  recommendationCount: Math.max(0, recCount - 1),
+                  dislikeCount: disCount + 1
+                })
+              }
+            }
+          }
+        } else {
+          // New vote
+          transaction.set(recRef, {
+            uid: user.uid,
+            displayName: user.displayName || 'Anonymous',
+            photoURL: user.photoURL || null,
+            stockId: id,
+            type: targetType,
+            reason: '',
+            createdAt: serverTimestamp()
+          })
+
+          if (stockSnapshot.exists()) {
+            if (targetType === 'up') {
+              transaction.update(stockRef, { recommendationCount: recCount + 1 })
+            } else {
+              transaction.update(stockRef, { dislikeCount: disCount + 1 })
+            }
+          } else {
+            transaction.set(stockRef, {
+              ...stock,
+              recommendationCount: targetType === 'up' ? 1 : 0,
+              dislikeCount: targetType === 'down' ? 1 : 0,
+              createdAt: serverTimestamp()
+            })
+          }
+        }
+      })
+    } catch (error) {
+      console.error('Vote toggle failed:', error)
+      alert(language === 'KO' ? '투표 처리 중 오류가 발생했습니다.' : 'Failed to process vote.')
+    } finally {
+      setVotingLoading(false)
+    }
+  }
+
+  // Submit Community Discussion Post
+  const handleDiscussionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) {
+      setIsDetailLoginOpen(true)
+      return
+    }
+    if (!id || !discussionContent.trim()) return
+    if (discussionContent.trim().length > 500) {
+      alert(language === 'KO' ? '의견은 500자 이하로 작성해 주세요.' : 'Opinion must be 500 characters or less.')
+      return
+    }
+
+    setDiscussionSubmitting(true)
+    try {
+      await addDoc(collection(db, 'discussions'), {
+        stockId: id,
+        uid: user.uid,
+        displayName: user.displayName || 'Anonymous',
+        photoURL: user.photoURL || null,
+        content: discussionContent.trim(),
+        createdAt: serverTimestamp()
+      })
+      setDiscussionContent('')
+
+      // Increment user's commentCount
+      await updateDoc(doc(db, 'users', user.uid), {
+        commentCount: increment(1)
+      }).catch(err => console.error("Error updating user comment stats:", err))
+    } catch (error) {
+      console.error('Failed to post discussion:', error)
+      alert(language === 'KO' ? '의견 등록에 실패했습니다.' : 'Failed to post opinion.')
+    } finally {
+      setDiscussionSubmitting(false)
+    }
+  }
+
+  // Delete Community Discussion Post
+  const handleDiscussionDelete = async (discussionId: string) => {
+    if (!confirm(language === 'KO' ? '정말로 이 의견을 삭제하시겠습니까?' : 'Are you sure you want to delete this opinion?')) return
+    try {
+      await deleteDoc(doc(db, 'discussions', discussionId))
+      if (user) {
+        await updateDoc(doc(db, 'users', user.uid), {
+          commentCount: increment(-1)
+        }).catch(err => console.error("Error updating user comment stats:", err))
+      }
+    } catch (error) {
+      console.error('Failed to delete discussion:', error)
+    }
+  }
+
+  // Format creation timestamp
+  const formatTimestamp = (createdAt: any) => {
+    if (!createdAt) return language === 'KO' ? '방금 전' : 'Just now'
+    const seconds = createdAt.seconds || (createdAt.toMillis ? Math.floor(createdAt.toMillis() / 1000) : null)
+    if (!seconds) return language === 'KO' ? '방금 전' : 'Just now'
+    const date = new Date(seconds * 1000)
+    return date.toLocaleDateString(
+      language === 'KO' ? 'ko-KR' : language === 'VI' ? 'vi-VN' : 'en-US',
+      { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+    )
+  }
 
   if (loading && !stock) {
     return (
@@ -70,9 +344,14 @@ export default function StockDetail() {
   const targetPe = stock.defaultTargetPe
   const currentEps = eps[stock.id] || stock.eps
 
-  // Recalculate metrics based on targetPe & currentPrice state
-  const fairPrice = calculateFairPrice(currentEps, targetPe)
-  const expectedReturn = calculateExpectedReturn(currentPrice / currentEps)
+  // A stock is awaiting sync if isAwaitingSync is true, or if currentPrice/eps are both placeholder 1
+  const isAwaitingSync = stock.isAwaitingSync || (currentPrice === 1 && currentEps === 1)
+  const isDeficit = currentEps <= 0
+
+  // Recalculate metrics based on targetPe & currentPrice state with BPS support for deficit companies
+  const fairPrice = calculateFairPrice(currentEps, targetPe, stock.bps, stock.pbr, currentPrice)
+  const currentPe = currentEps > 0 ? currentPrice / currentEps : 0
+  const expectedReturn = calculateExpectedReturn(currentPe)
   const stockTemp = calculateStockTemperature(currentPrice, fairPrice)
 
   const getLocalizedTempDetails = (temp: number, t: any) => {
@@ -129,37 +408,61 @@ export default function StockDetail() {
     }
   }
 
-  const tempDetails = getLocalizedTempDetails(stockTemp, t)
+  const tempDetails = isAwaitingSync ? {
+    label: language === 'KO' ? '대기 중' : language === 'VI' ? 'Đang chờ' : 'Pending',
+    description: language === 'KO'
+      ? '이 종목은 새로 등록되어 실시간 데이터를 수집하는 단계입니다. 최대 10분 정도 소요될 수 있습니다.'
+      : language === 'VI'
+      ? 'Cổ phiếu này mới được đăng ký và dữ liệu đang được phân tích. Có thể mất tới 10 phút.'
+      : 'This stock is newly registered and data is being processed. This may take up to 10 minutes.',
+    colorClass: 'text-amber-400',
+    badgeColorClass: 'bg-amber-950/80 text-amber-300 border-amber-900/50',
+    emoji: '⏳',
+    iconName: 'wind' as const,
+    tempVal: '-- °C',
+  } : getLocalizedTempDetails(stockTemp, t)
 
   const displayName = language === 'KO' ? (stock.koreanName || stock.name) : stock.name
-  const baseRate = getBaseInterestRate(stock.country)
+  const baseRateNum = getBaseRateNumber(stock.country)
+  const baseRate = `${baseRateNum.toFixed(2)}%`
+  const yieldSpread = Number((expectedReturn - baseRateNum).toFixed(2))
+  const isPositiveSpread = yieldSpread >= 0
 
-  // Load real-world synced news or fallback to mock news
+  // Load real-world synced news, on-demand AI reports, or fallback to mock news
   let newsList: any[] = []
-  if (language === 'KO' && stock.latestNews_KO && stock.latestNews_KO.length > 0) {
-    newsList = stock.latestNews_KO
-  } else if (language === 'VI' && stock.latestNews_VI && stock.latestNews_VI.length > 0) {
-    newsList = stock.latestNews_VI
-  } else if (stock.latestNews_EN && stock.latestNews_EN.length > 0) {
-    newsList = stock.latestNews_EN
+  const activeReports = dynamicAiReports || stock
+  if (language === 'KO' && activeReports.latestNews_KO && activeReports.latestNews_KO.length > 0) {
+    newsList = activeReports.latestNews_KO
+  } else if (language === 'VI' && activeReports.latestNews_VI && activeReports.latestNews_VI.length > 0) {
+    newsList = activeReports.latestNews_VI
+  } else if (activeReports.latestNews_EN && activeReports.latestNews_EN.length > 0) {
+    newsList = activeReports.latestNews_EN
   } else {
     newsList = getMockNews(stock, displayName, language)
   }
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       {/* Top Header Navigation */}
       <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div className="flex items-center gap-4">
-          <Link
-            to="/"
-            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors"
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1)
+              } else {
+                navigate('/')
+              }
+            }}
+            className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            title={t('backToDashboard')}
           >
             <ArrowLeft className="w-5 h-5" />
-          </Link>
+          </button>
           <div>
             <span className="text-xs font-bold text-slate-550 uppercase tracking-wider block">
-              {COUNTRY_NAMES[stock.country as 'KR' | 'US' | 'VN' | 'CN']} | {translateIndustry(stock.industry)}
+              {getCountryName(stock.country, language)} | {translateIndustry(stock.industry, language)}
             </span>
             <div className="flex items-center gap-2 mt-0.5">
               <h2 className="text-xl md:text-2xl font-black text-slate-100">
@@ -185,37 +488,199 @@ export default function StockDetail() {
         </button>
       </div>
 
-      {/* Top Metrics Grid (4-Card) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('currentPrice')}</span>
-          <span className="block text-xl md:text-2xl font-black text-slate-200 mt-1.5 font-mono">
-            {stock.currency} {currentPrice.toLocaleString()}
-          </span>
+      {/* Pending Sync Warning Alert */}
+      {isAwaitingSync && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-3xl p-4 sm:p-5 flex items-start gap-3.5 shadow-md shadow-amber-500/2">
+          <div className="bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 shrink-0 text-amber-400">
+            <Zap className="w-5 h-5 animate-pulse" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">
+              {language === 'KO' ? '실시간 데이터 동기화 대기 중' : language === 'VI' ? 'Đang đợi đồng bộ dữ liệu' : 'Real-time Data Sync Pending'}
+            </h4>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {language === 'KO'
+                ? '이 종목은 신규 등록되어 현재 백그라운드 크롤러가 실시간 주가 및 재무 데이터를 수집 중입니다. 10분 내로 가격 정보가 정상 갱신되어 적정 주가와 온도가 업데이트됩니다.'
+                : language === 'VI'
+                ? 'Cổ phiếu này mới đăng ký. Dữ liệu giá hiện tại đang được thu thập trực tuyến. Giá hợp lý và nhiệt độ sẽ hoàn tất cập nhật trong 10 phút.'
+                : 'This stock has been newly registered. Our background crawler is currently retrieving real-time price & financials. Data will be fully synced in 10 minutes.'}
+            </p>
+          </div>
         </div>
+      )}
 
-        <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('fairPrice')}</span>
-          <span className="block text-xl md:text-2xl font-black text-blue-400 mt-1.5 font-mono">
-            {stock.currency} {Math.round(fairPrice).toLocaleString()}
-          </span>
-        </div>
+      {/* Top 2-Card Master Deck: [1. 주가 밸류에이션 (현재가 ➔ 갭 ➔ 적정가)] & [2. 금리 대비 수익률 (기준금리 ➔ 마진 ➔ 기대수익)] */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Master Card 1: 주가 밸류에이션 (스마트 벡터 플로우) */}
+        {(() => {
+          const priceGapPct = fairPrice > 0 ? ((fairPrice - currentPrice) / currentPrice) * 100 : 0
+          const isUndervalued = priceGapPct >= 0
 
-        <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('baseInterestRate')}</span>
-          <span className="block text-xl md:text-2xl font-black text-amber-500 mt-1.5 font-mono">
-            {baseRate}
-          </span>
-        </div>
+          return (
+            <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+              {/* Header: Title & Upside Badge */}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                  <span>💎</span>
+                  <span>{language === 'KO' ? '주가 밸류에이션' : language === 'VI' ? 'Định giá cổ phiếu' : 'Price Valuation'}</span>
+                </span>
+                {!isAwaitingSync && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {isDeficit && (
+                      <span className="text-[9px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/25">
+                        {language === 'KO' ? '순익적자 (BPS)' : 'BPS Basis'}
+                      </span>
+                    )}
+                    {fairPrice > 0 && (
+                      <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
+                        isUndervalued 
+                          ? 'bg-blue-500/20 border-blue-400/40 text-blue-300' 
+                          : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
+                      }`}>
+                        {language === 'KO'
+                          ? `적정가와 ${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% 차이 (${isUndervalued ? '저평가' : '고평가'})`
+                          : language === 'VI'
+                          ? `Chênh lệch ${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% (${isUndervalued ? 'Định giá thấp' : 'Định giá cao'})`
+                          : `${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% vs Fair Value (${isUndervalued ? 'Undervalued' : 'Overvalued'})`}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
 
-        <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-5 shadow-lg">
-          <span className="block text-xs text-slate-200 font-bold uppercase tracking-wider">{t('expectedReturn')}</span>
-          <span className={`block text-xl md:text-2xl font-black mt-1.5 font-mono flex items-center gap-1.5 ${
-            expectedReturn > 10 ? 'text-emerald-400' : 'text-slate-300'
-          }`}>
-            <TrendingUp className="w-5 h-5 shrink-0" />
-            {expectedReturn}%
-          </span>
+              {/* Vector Flow Body: [ 현재가 ] ──▶ [ 방향 & 괴리율 ] ──▶ [ AI 적정가 ] */}
+              <div className="mt-4 pt-1">
+                {isAwaitingSync || fairPrice <= 0 ? (
+                  <div className="flex items-center justify-between py-4 px-2">
+                    <div className="text-left">
+                      <span className="text-[11px] text-slate-400 block">{language === 'KO' ? '현재가' : 'Current'}</span>
+                      <span className="text-2xl font-black font-mono text-slate-100">{isAwaitingSync ? '--' : `${stock.currency} ${currentPrice.toLocaleString()}`}</span>
+                    </div>
+                    <div className="text-slate-500 font-bold text-sm">➔</div>
+                    <div className="text-right">
+                      <span className="text-[11px] text-slate-400 block">{language === 'KO' ? 'AI 적정가' : 'Fair Value'}</span>
+                      <span className="text-xl font-bold font-mono text-slate-400">N/A</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+                    {/* Left Box: 현재 시장가 */}
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+                        <span className="whitespace-nowrap">{language === 'KO' ? '현재 주가' : 'Current Price'}</span>
+                      </div>
+                      <div className="text-base sm:text-xl lg:text-2xl font-black font-mono text-slate-100 tracking-tight mt-0.5 whitespace-nowrap">
+                        {stock.currency} {currentPrice.toLocaleString()}
+                      </div>
+                    </div>
+
+                    {/* Center Vector Indicator with Trending Icon & Hover Zoom */}
+                    <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
+                      <div className={`group flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-xl ${
+                        isUndervalued 
+                          ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25' 
+                          : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
+                      }`}>
+                        {isUndervalued ? (
+                          <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                        ) : (
+                          <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                        )}
+                        <span className="text-sm sm:text-base font-extrabold tracking-tight whitespace-nowrap">
+                          {isUndervalued ? `+${priceGapPct.toFixed(1)}%` : `${priceGapPct.toFixed(1)}%`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right Box: AI 적정가 */}
+                    <div className="flex-1 min-w-0 text-right">
+                      <div className="text-[10px] sm:text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-end gap-1">
+                        <span className="whitespace-nowrap">{language === 'KO' ? 'AI 적정가' : 'AI Fair Value'}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
+                      </div>
+                      <div className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 whitespace-nowrap ${
+                        isUndervalued ? 'text-cyan-400' : 'text-blue-400'
+                      }`}>
+                        {stock.currency} {Math.round(fairPrice).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Master Card 2: 금리 대비 수익률 (스마트 벡터 플로우) */}
+        <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+          {/* Header: Title & Status Badge */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>{language === 'KO' ? '금리 대비 수익률' : language === 'VI' ? 'Lợi suất so với Lãi suất' : 'Yield vs Base Rate'}</span>
+            </span>
+            {!isAwaitingSync && (
+              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
+                isPositiveSpread 
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
+                  : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              }`}>
+                {language === 'KO'
+                  ? `${isPositiveSpread ? '+' : ''}${yieldSpread.toFixed(2)}%p ${isPositiveSpread ? '여유' : '부족'}`
+                  : language === 'VI'
+                  ? `${isPositiveSpread ? '+' : ''}${yieldSpread.toFixed(2)}%p ${isPositiveSpread ? 'Dư thừa' : 'Thiếu hụt'}`
+                  : `${isPositiveSpread ? '+' : ''}${yieldSpread.toFixed(2)}%p ${isPositiveSpread ? 'Surplus' : 'Deficit'}`}
+              </span>
+            )}
+          </div>
+
+          {/* Vector Flow Body: [ 국가 기준금리 ] ──▶ [ 마진 갭 ] ──▶ [ 기업 기대수익률 ] */}
+          <div className="mt-4 pt-1">
+            <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+              {/* Left Box: 기준금리 */}
+              <div className="flex-1 min-w-0 text-left">
+                <div className="text-[10px] sm:text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                  <span className="whitespace-nowrap">{language === 'KO' ? `기준금리(${stock.country})` : `Base Rate(${stock.country})`}</span>
+                </div>
+                <div className="text-base sm:text-xl lg:text-2xl font-black font-mono text-amber-400 tracking-tight mt-0.5 whitespace-nowrap">
+                  {baseRate}
+                </div>
+              </div>
+
+              {/* Center Vector Indicator with Trending Icon & Hover Zoom */}
+              <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
+                <div className={`group flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-xl ${
+                  isPositiveSpread 
+                    ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25' 
+                    : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
+                }`}>
+                  {isPositiveSpread ? (
+                    <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                  ) : (
+                    <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                  )}
+                  <span className="text-sm sm:text-base font-extrabold tracking-tight whitespace-nowrap">
+                    {isPositiveSpread ? `+${yieldSpread.toFixed(2)}%p` : `${yieldSpread.toFixed(2)}%p`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Right Box: 기업 기대수익률 */}
+              <div className="flex-1 min-w-0 text-right">
+                <div className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-end gap-1">
+                  <span className="whitespace-nowrap">{language === 'KO' ? '기업 기대수익률' : 'Earnings Yield'}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                </div>
+                <div className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 whitespace-nowrap ${
+                  isPositiveSpread ? 'text-emerald-400' : 'text-slate-100'
+                }`}>
+                  {isAwaitingSync ? '--' : `${expectedReturn}%`}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -227,9 +692,12 @@ export default function StockDetail() {
           <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 shadow-2xl flex flex-col justify-between h-full">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-                  {language === 'KO' ? 'StockTemp 가치 평가 요약' : language === 'VI' ? 'Tóm tắt định giá StockTemp' : 'StockTemp Valuation Summary'}
+                <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-60"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                  </span>
+                  <span>{language === 'KO' ? 'StockTemp 가치 평가 요약' : language === 'VI' ? 'Tóm tắt định giá StockTemp' : 'StockTemp Valuation Summary'}</span>
                 </h3>
               </div>
 
@@ -238,8 +706,8 @@ export default function StockDetail() {
                 {/* Left side (8/12 column): Temp Banner and Action Guide with reduced width */}
                 <div className="col-span-8 flex flex-col justify-between gap-4">
                   {/* Stock Temperature Banner with WeatherIcon only */}
-                  <div className="flex items-center gap-4 bg-slate-950/50 border border-slate-800/60 rounded-2xl p-4 flex-1">
-                    <div className="bg-slate-900 border border-slate-850 p-2.5 rounded-xl shadow-inner shrink-0">
+                  <div className="flex items-center gap-4 bg-gradient-to-r from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-4 flex-1 shadow-md">
+                    <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl shadow-inner shrink-0">
                       <WeatherIcon name={tempDetails.iconName} className="w-8 h-8" />
                     </div>
                     <div className="space-y-1 min-w-0">
@@ -257,24 +725,31 @@ export default function StockDetail() {
                     </div>
                   </div>
 
-                  {/* Action Recommendation Message (Same width) */}
-                  <div className="bg-slate-950/30 border border-slate-850 p-4 rounded-xl text-xs text-slate-300 leading-relaxed">
-                    <span className="font-bold text-slate-400 block mb-1 text-[10px] uppercase tracking-wider">
+                  {/* Action Recommendation Message */}
+                  <div className="bg-gradient-to-br from-slate-950/80 via-indigo-950/20 to-slate-950/80 border border-indigo-500/20 shadow-inner p-4 rounded-xl text-xs text-slate-300 leading-relaxed">
+                    <span className="font-bold text-indigo-400 block mb-1 text-[10px] uppercase tracking-wider">
                       {language === 'KO' ? '행동 가이드' : language === 'VI' ? 'Hướng dẫn hành động' : 'Action Guide'}
                     </span>
                     {tempDetails.description}
                   </div>
                 </div>
 
-                {/* Right side (4/12 column): Vertical Temperature Gauge (Wider, Bolder & Stretched) */}
-                <div className="col-span-4 bg-slate-950/50 border border-slate-800/60 rounded-2xl p-1.5 flex flex-col items-center justify-center min-h-[185px]">
-                  {renderVerticalTempGauge(stockTemp)}
+                {/* Right side (4/12 column): Vertical Temperature Gauge */}
+                <div className="col-span-4 bg-gradient-to-b from-slate-950/80 via-slate-900/40 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-1.5 flex flex-col items-center justify-center min-h-[185px] shadow-md">
+                  {isAwaitingSync ? (
+                    <div className="flex flex-col items-center justify-center space-y-2 py-4">
+                      <div className="w-6 h-6 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Syncing</span>
+                    </div>
+                  ) : (
+                    renderVerticalTempGauge(stockTemp)
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Core Metrics Unified Box (Option 2) */}
-            <div className="mt-4 bg-slate-950/30 border border-slate-850/80 rounded-2xl p-4">
+            <div className="mt-4 bg-gradient-to-br from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-blue-500/20 rounded-2xl p-4 shadow-lg">
               <div className="grid grid-cols-3 text-center divide-x divide-slate-800/40">
                 {/* 1. Target P/E Multiple (AI Target) */}
                 <div className="space-y-1 min-w-0">
@@ -292,7 +767,7 @@ export default function StockDetail() {
                     {language === 'KO' ? '현재 P/E' : language === 'VI' ? 'P/E hiện tại' : 'Current P/E'}
                   </span>
                   <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
-                    {(currentPrice / currentEps).toFixed(1)}x
+                    {isAwaitingSync ? '--' : `${(currentPrice / currentEps).toFixed(1)}x`}
                   </span>
                 </div>
 
@@ -352,16 +827,79 @@ export default function StockDetail() {
             <CustomBpsChart stock={stock} currentPrice={currentPrice} t={t} />
           </div>
           
-          <ConsensusCompareChart stock={stock} currentPrice={currentPrice} fairPrice={fairPrice} language={language} t={t} />
+          {isAwaitingSync ? (
+            <div className="flex flex-col items-center justify-center h-48 border border-dashed border-slate-800 bg-slate-950/10 rounded-3xl p-6 text-center space-y-2">
+              <span className="text-2xl">📊</span>
+              <p className="text-xs text-slate-400 font-bold">
+                {language === 'KO' ? '비교 차트 생성 대기 중' : language === 'VI' ? 'Đang tạo biểu đồ so sánh' : 'Comparison Chart Pending'}
+              </p>
+              <p className="text-[10px] text-slate-500 leading-relaxed max-w-xs">
+                {language === 'KO' ? '주가와 재무 데이터 동기화가 완료되면 가치산정 비교 차트가 시각화됩니다.' : 'The comparison chart will visualize fair price relative to current market price once synced.'}
+              </p>
+            </div>
+          ) : isDeficit || fairPrice <= 0 ? (
+            <div className="flex flex-col items-center justify-center h-44 bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-slate-800/80 rounded-2xl p-6 text-center space-y-2 shadow-xl">
+              <p className="text-sm text-slate-200 font-extrabold">
+                {language === 'KO' ? '적정가 산정불가 (적자기업)' : language === 'VI' ? 'Không thể tính giá hợp lý (Doanh nghiệp thua lỗ)' : 'Fair Price Not Applicable (Deficit Company)'}
+              </p>
+              <p className="text-[11px] text-slate-400 leading-relaxed max-w-sm">
+                {language === 'KO' 
+                  ? '당기순손실(EPS 음수) 기업은 P/E 기반의 적정주가가 산정되지 않습니다. BPS 추이를 참고해 주세요.' 
+                  : 'P/E-based fair price is not applicable for companies with negative earnings. Please refer to BPS trend.'}
+              </p>
+            </div>
+          ) : (
+            <ConsensusCompareChart stock={stock} currentPrice={currentPrice} fairPrice={fairPrice} language={language} t={t} />
+          )}
+
+          {/* Regulatory In-line Disclaimer (Vietnamese Securities Law & Global Compliance) */}
+          <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs sm:text-[13px] font-medium text-slate-300 leading-relaxed select-none shadow-sm">
+            <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+            <p>
+              {language === 'KO'
+                ? '💡 본 지표는 투자 권유가 아닌 참고용 가상 분석 자료이며, 모든 투자 책임은 본인에게 귀속됩니다.'
+                : language === 'VI'
+                ? '💡 Dữ liệu chỉ mang tính chất tham khảo học thuật, không cấu thành lời khuyên đầu tư hay mua bán chứng khoán.'
+                : '💡 For informational and simulation purposes only. Does not constitute investment advice or trading solicitations.'}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Bottom: Latest News Section (Max 3 articles) */}
       <div className="border-t border-slate-800/60 pt-8 space-y-4">
-        <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-yellow-400 fill-yellow-400/20" /> {t('latestNews')}
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-yellow-400 fill-yellow-400/20" /> {t('latestNews')}
+          </h3>
+          <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center gap-1.5 shadow-sm">
+            <Sparkles className="w-3 h-3 text-blue-400" />
+            <span>Gemini 3.6 Flash AI</span>
+          </span>
+        </div>
 
+        {isGeneratingAi ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="bg-slate-900 border border-blue-500/20 rounded-2xl p-5 space-y-3 animate-pulse">
+                <div className="flex justify-between items-center">
+                  <div className="h-3 w-20 bg-slate-800 rounded"></div>
+                  <div className="h-3 w-12 bg-slate-800 rounded"></div>
+                </div>
+                <div className="h-4 w-3/4 bg-blue-500/20 rounded"></div>
+                <div className="space-y-1.5 pt-2">
+                  <div className="h-2.5 w-full bg-slate-800 rounded"></div>
+                  <div className="h-2.5 w-5/6 bg-slate-800 rounded"></div>
+                  <div className="h-2.5 w-4/6 bg-slate-800 rounded"></div>
+                </div>
+                <div className="text-[10px] text-blue-400 font-bold pt-2 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 animate-spin" />
+                  <span>{language === 'KO' ? 'AI 심층 분석 생성 중...' : 'AI generating analysis...'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           {newsList.map((news, idx) => {
             const isExpanded = expandedNewsIndex === idx
@@ -408,6 +946,314 @@ export default function StockDetail() {
               </div>
             )
           })}
+        </div>
+        )}
+      </div>
+
+      {/* Social Recommendation & Community Discussion Section */}
+      <div className="border-t border-slate-800/60 pt-8 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Left Column: One-Click Vote Widget (Lg: 5/12) */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 shadow-2xl space-y-5 select-none">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-blue-400" />
+                  <span>
+                    {language === 'KO' ? '이 종목 추천/비추천 투표' : language === 'VI' ? 'Bình chọn cổ phiếu này' : 'Stock Sentiment Vote'}
+                  </span>
+                </h3>
+                {myVote && (
+                  <span className="text-[10px] font-mono font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-full">
+                    {language === 'KO' ? '참여완료' : language === 'VI' ? 'Đã bình chọn' : 'Voted'}
+                  </span>
+                )}
+              </div>
+
+              {/* Vote Ratio Progress Gauge Bar */}
+              {(() => {
+                const upCount = stock.recommendationCount || 0
+                const downCount = stock.dislikeCount || 0
+                const totalVotes = upCount + downCount
+                const upPercent = totalVotes > 0 ? Math.round((upCount / totalVotes) * 100) : 50
+                const downPercent = 100 - upPercent
+
+                return (
+                  <div className="space-y-2 bg-gradient-to-r from-slate-950/80 via-blue-950/25 to-slate-950/80 p-4 rounded-2xl border border-blue-500/25 shadow-md">
+                    <div className="flex justify-between items-center text-xs font-mono font-bold">
+                      <span className="text-emerald-400 flex items-center gap-1">
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                        <span>{language === 'KO' ? '추천' : 'Up'} {upCount} ({upPercent}%)</span>
+                      </span>
+                      <span className="text-rose-400 flex items-center gap-1">
+                        <span>{downPercent}% ({downCount}) {language === 'KO' ? '비추천' : 'Down'}</span>
+                        <ThumbsDown className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+
+                    {/* Visual Bar */}
+                    <div className="w-full h-3 bg-slate-850 rounded-full overflow-hidden flex shadow-inner">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 shadow-sm"
+                        style={{ width: `${upPercent}%` }}
+                      />
+                      <div 
+                        className="h-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-500 shadow-sm"
+                        style={{ width: `${downPercent}%` }}
+                      />
+                    </div>
+
+                    <div className="text-right text-[10px] text-slate-500 font-medium pt-0.5">
+                      {totalVotes > 0 
+                        ? (language === 'KO' ? `총 ${totalVotes}명의 투자자가 참여했습니다.` : `Total ${totalVotes} votes cast.`)
+                        : (language === 'KO' ? '첫 투표의 주인공이 되어보세요!' : 'Be the first to cast a vote!')}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* One-Click Action Buttons */}
+              <div className="flex gap-3.5">
+                <button
+                  type="button"
+                  disabled={votingLoading}
+                  onClick={() => handleVoteToggle('up')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border text-xs font-black uppercase transition-all cursor-pointer ${
+                    myVote?.type === 'up'
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/20 scale-[1.02]'
+                      : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  <ThumbsUp className={`w-4 h-4 ${myVote?.type === 'up' ? 'text-emerald-400 animate-bounce' : ''}`} />
+                  <span>{language === 'KO' ? '추천 (UP)' : language === 'VI' ? 'Tăng (UP)' : 'Up'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={votingLoading}
+                  onClick={() => handleVoteToggle('down')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border text-xs font-black uppercase transition-all cursor-pointer ${
+                    myVote?.type === 'down'
+                      ? 'bg-rose-500/20 border-rose-500 text-rose-300 ring-2 ring-rose-500/30 shadow-lg shadow-rose-500/20 scale-[1.02]'
+                      : 'bg-slate-950/80 border-slate-800 text-slate-400 hover:bg-slate-850 hover:text-slate-200 hover:border-slate-700'
+                  }`}
+                >
+                  <ThumbsDown className={`w-4 h-4 ${myVote?.type === 'down' ? 'text-rose-400 animate-bounce' : ''}`} />
+                  <span>{language === 'KO' ? '비추천 (DOWN)' : language === 'VI' ? 'Giảm (DOWN)' : 'Down'}</span>
+                </button>
+              </div>
+
+              {/* Status or Login Hint */}
+              {!user ? (
+                <div className="bg-gradient-to-r from-slate-950/80 via-indigo-950/20 to-slate-950/80 border border-indigo-500/20 p-4 rounded-2xl space-y-3 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setIsDetailLoginOpen(!isDetailLoginOpen)}
+                    className="w-full flex items-center justify-between text-left group cursor-pointer"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-bold text-slate-350 group-hover:text-blue-400 transition-colors flex items-center gap-1.5">
+                        <LogIn className="w-3.5 h-3.5 text-blue-400" />
+                        {language === 'KO' ? '로그인하고 1초 만에 투표하기' : 'Sign in for 1-click voting'}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {language === 'KO' ? '로그인 후 원클릭으로 추천/비추천 투표에 참여할 수 있습니다.' : 'Sign in to vote on this stock.'}
+                      </p>
+                    </div>
+                    {isDetailLoginOpen ? (
+                      <ChevronUp className="w-4 h-4 text-slate-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-500 group-hover:translate-y-0.5 transition-transform" />
+                    )}
+                  </button>
+
+                  {isDetailLoginOpen && (
+                    <div className="pt-3 border-t border-slate-800/40 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <LoginInline />
+                    </div>
+                  )}
+                </div>
+              ) : myVote ? (
+                <p className="text-[11px] text-slate-500 text-center font-medium">
+                  {language === 'KO' 
+                    ? '✓ 투표가 반영되었습니다. (선택된 버튼을 다시 누르면 취소됩니다)' 
+                    : language === 'VI' 
+                    ? '✓ Bình chọn đã được ghi nhận. (Nhấp lại để hủy)' 
+                    : '✓ Your vote is recorded. (Click again to cancel)'}
+                </p>
+              ) : (
+                <p className="text-[11px] text-slate-500 text-center font-medium">
+                  {language === 'KO' 
+                    ? '버튼을 1번 누르면 즉시 투표수가 반영됩니다.' 
+                    : 'Click a button above to cast your sentiment vote instantly.'}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Free Community Discussion Feed (Lg: 7/12) */}
+          <div className="lg:col-span-7 space-y-4 flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
+              <h3 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-indigo-400" />
+                <span>
+                  {language === 'KO' ? '투자자 종목 토론' : language === 'VI' ? 'Thảo luận cổ phiếu' : 'Investor Discussion'}
+                </span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-mono font-bold">
+                  {discussions.length}
+                </span>
+              </h3>
+            </div>
+
+            {/* Discussion Input Form */}
+            {user ? (
+              <form onSubmit={handleDiscussionSubmit} className="space-y-3 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                    {user.photoURL ? (
+                      <img 
+                        src={user.photoURL} 
+                        alt="Me" 
+                        className="w-5 h-5 rounded-full border border-blue-500/30" 
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <User className="w-4 h-4 text-blue-400" />
+                    )}
+                    <span>{user.displayName || 'User'}</span>
+                  </span>
+                  <span className={`text-[10px] font-mono font-bold ${discussionContent.length >= 500 ? 'text-rose-400' : 'text-slate-500'}`}>
+                    {discussionContent.length}/500
+                  </span>
+                </div>
+
+                <textarea
+                  value={discussionContent}
+                  onChange={(e) => setDiscussionContent(e.target.value.slice(0, 500))}
+                  placeholder={
+                    language === 'KO' 
+                      ? '이 종목의 실적 전망, 목표가, 매수/매도 이유 등 자유로운 투자 의견을 남겨보세요.' 
+                      : language === 'VI'
+                      ? 'Chia sẻ nhận định, kỳ vọng giá hoặc phân tích của bạn về cổ phiếu này.'
+                      : 'Share your analysis, target price, or thoughts on this stock...'
+                  }
+                  className="w-full h-20 bg-slate-950 border border-slate-800 hover:border-slate-700 focus:border-blue-500/60 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none resize-none leading-relaxed transition-all shadow-inner"
+                />
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={discussionSubmitting || !discussionContent.trim()}
+                    className="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 text-xs font-bold text-white rounded-xl shadow-md shadow-blue-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>
+                      {discussionSubmitting 
+                        ? (language === 'KO' ? '등록 중...' : 'Posting...') 
+                        : (language === 'KO' ? '의견 등록' : language === 'VI' ? 'Gửi ý kiến' : 'Post Opinion')}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-4 bg-gradient-to-r from-slate-950/80 via-indigo-950/30 to-slate-950/80 border border-indigo-500/25 rounded-2xl flex items-center justify-between gap-3 shadow-md">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-300">
+                    {language === 'KO' ? '로그인하고 투자자들과 자유롭게 의견을 나눠보세요!' : 'Sign in to join the discussion and share your thoughts!'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDetailLoginOpen(true)}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer shrink-0"
+                >
+                  {language === 'KO' ? '로그인' : 'Sign In'}
+                </button>
+              </div>
+            )}
+
+            {/* Discussions List Feed */}
+            <div className="flex-1 overflow-y-auto max-h-[450px] pr-1 space-y-3.5 min-h-[200px]">
+              {discussions.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center py-16 text-center text-xs text-slate-500 space-y-2 bg-slate-900/10 border border-slate-800/40 rounded-3xl">
+                  <MessageSquare className="w-8 h-8 text-slate-750" />
+                  <p>
+                    {language === 'KO' 
+                      ? '등록된 토론 글이 아직 없습니다. 첫 의견을 남겨보세요!' 
+                      : language === 'VI'
+                      ? 'Chưa có thảo luận nào. Hãy là người đầu tiên để lại ý kiến!'
+                      : 'No discussion posts yet. Be the first to share your thoughts!'}
+                  </p>
+                </div>
+              ) : (
+                discussions.map((item) => {
+                  const isMyPost = user && item.uid === user.uid
+                  return (
+                    <div 
+                      key={item.id}
+                      className={`p-4 rounded-2xl border transition-all ${
+                        isMyPost
+                          ? 'bg-slate-900/90 border-blue-500/20 shadow-md shadow-blue-500/5'
+                          : 'bg-slate-900/80 border-slate-800/80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          {item.photoURL ? (
+                            <img 
+                              src={item.photoURL} 
+                              alt="Avatar" 
+                              className="w-7 h-7 rounded-full border border-slate-800 shrink-0"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
+                              <User className="w-3.5 h-3.5 text-slate-400" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-slate-200 truncate">
+                                {item.displayName}
+                              </span>
+                              {isMyPost && (
+                                <span className="text-[9px] font-black text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.2 rounded-full uppercase shrink-0">
+                                  Me
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1 mt-0.5">
+                              <Calendar className="w-3 h-3 text-slate-600" />
+                              {formatTimestamp(item.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isMyPost && (
+                          <button
+                            type="button"
+                            onClick={() => handleDiscussionDelete(item.id)}
+                            className="p-1.5 text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer shrink-0"
+                            title={language === 'KO' ? '삭제' : 'Delete'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-slate-300 mt-3 leading-relaxed whitespace-pre-line">
+                        {item.content}
+                      </p>
+
+                      <OpinionReplies opinionId={item.id} stockId={stock.id} parentCollection="discussions" />
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -510,13 +1356,13 @@ const renderVerticalTempGauge = (temp: number) => {
   );
 };
 
-const getBaseInterestRate = (country: string) => {
+const getBaseRateNumber = (country: string): number => {
   switch (country) {
-    case 'KR': return '3.50%';
-    case 'US': return '5.25%';
-    case 'VN': return '4.50%';
-    case 'CN': return '3.35%';
-    default: return '3.50%';
+    case 'KR': return 3.50;
+    case 'US': return 5.25;
+    case 'VN': return 4.50;
+    case 'CN': return 3.35;
+    default: return 3.50;
   }
 }
 
@@ -890,7 +1736,7 @@ function CustomRevenueEpsChart({ stock, currentEps, language, t }: { stock: any;
   const chartHeight = height - padding.top - padding.bottom
 
   return (
-    <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-4 space-y-3">
+    <div className="bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-indigo-500/25 rounded-2xl p-4 space-y-3 shadow-xl">
       <div className="flex justify-between items-center text-xs">
         <span className="font-bold text-slate-300">{t('quarterlyRevenueEps')}</span>
         <div className="flex gap-3 text-[9px] font-bold">
@@ -1076,7 +1922,7 @@ function CustomBpsChart({ stock, currentPrice, t }: { stock: any; currentPrice: 
   const chartHeight = height - padding.top - padding.bottom
 
   return (
-    <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-4 space-y-3">
+    <div className="bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-emerald-500/25 rounded-2xl p-4 space-y-3 shadow-xl">
       <div className="flex justify-between items-center text-xs">
         <span className="font-bold text-slate-300">{t('quarterlyBps')}</span>
         <span className="text-emerald-400 text-[10px] font-bold font-mono">
@@ -1193,105 +2039,165 @@ function CustomBpsChart({ stock, currentPrice, t }: { stock: any; currentPrice: 
 }
 
 function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: { stock: any; currentPrice: number; fairPrice: number; language: string; t: any }) {
-  const consensusTarget = stock.consensusTarget ? Math.round(stock.consensusTarget) : Math.round(fairPrice * 1.15)
+  const hasConsensus = Boolean(stock.consensusTarget && Number(stock.consensusTarget) > 0)
+  const consensusTarget = hasConsensus ? Math.round(Number(stock.consensusTarget)) : 0
   const currency = stock.currency
 
-  const minVal = Math.min(currentPrice, fairPrice, consensusTarget) * 0.9
-  const maxVal = Math.max(currentPrice, fairPrice, consensusTarget) * 1.1
-  const range = maxVal - minVal
-
-  const getPercent = (val: number) => {
-    return range === 0 ? 0 : ((val - minVal) / range) * 100
-  }
-
-  const cpPct = getPercent(currentPrice)
-  const fpPct = getPercent(fairPrice)
-  const ctPct = getPercent(consensusTarget)
-
-  const isUpside = fairPrice > currentPrice
-  const upsidePct = Math.abs(((fairPrice - currentPrice) / currentPrice) * 100).toFixed(1)
+  const isUpside = fairPrice >= currentPrice
+  const upsidePct = Math.abs(((fairPrice - currentPrice) / (currentPrice || 1)) * 100).toFixed(1)
 
   // SVG parameters for the S-curve
   const svgWidth = 500
-  const svgHeight = 155
+  const svgHeight = 160
   const paddingX = 40
   const chartWidth = svgWidth - paddingX * 2
 
+  // Dynamic S-curve coordinates based on upside / downside direction:
   const getCoords = (pct: number) => {
-    const t = pct / 100
+    const t = Math.max(0, Math.min(1, pct / 100))
     const x = paddingX + t * chartWidth
-    // S-curve cosine mapping (left t=0 is lower Y=80, right t=1 is higher Y=30)
-    const y = 55 + 25 * Math.cos(Math.PI * t)
+    // S-curve cosine mapping (SVG y=0 is top, y=160 is bottom):
+    const y = isUpside 
+      ? (60 + 20 * Math.cos(Math.PI * t)) 
+      : (60 - 20 * Math.cos(Math.PI * t))
     return { x, y }
+  }
+
+  // Value-to-percentage mapping:
+  const cpPct = 18
+  const fpPct = 82
+  
+  // Place consensus target proportionally relative to Current Price and Fair Price
+  let ctPct = 50
+  if (hasConsensus && consensusTarget > 0) {
+    if (isUpside) {
+      if (consensusTarget <= currentPrice) {
+        ctPct = Math.max(8, 18 - (Math.min(1, (currentPrice - consensusTarget) / (currentPrice || 1))) * 10)
+      } else if (consensusTarget >= fairPrice) {
+        ctPct = Math.min(92, 82 + (Math.min(1, (consensusTarget - fairPrice) / (fairPrice || 1))) * 10)
+      } else {
+        const ratio = (consensusTarget - currentPrice) / Math.max(1, (fairPrice - currentPrice))
+        ctPct = 18 + ratio * 64
+      }
+    } else {
+      if (consensusTarget >= currentPrice) {
+        ctPct = Math.max(8, 18 - (Math.min(1, (consensusTarget - currentPrice) / (currentPrice || 1))) * 10)
+      } else if (consensusTarget <= fairPrice) {
+        ctPct = Math.min(92, 82 + (Math.min(1, (fairPrice - consensusTarget) / (fairPrice || 1))) * 10)
+      } else {
+        const ratio = (currentPrice - consensusTarget) / Math.max(1, (currentPrice - fairPrice))
+        ctPct = 18 + ratio * 64
+      }
+    }
   }
 
   const pCp = getCoords(cpPct)
   const pFp = getCoords(fpPct)
-  const pCt = getCoords(ctPct)
+  const pCt = hasConsensus ? getCoords(ctPct) : null
 
   // Generate smooth curve path
-  let curvePath = `M ${paddingX},80`
+  const startY = isUpside ? 80 : 40
+  let curvePath = `M ${paddingX},${startY}`
   for (let i = 1; i <= 100; i++) {
-    const t = i / 100
-    const x = paddingX + t * chartWidth
-    const y = 55 + 25 * Math.cos(Math.PI * t)
-    curvePath += ` L ${x},${y}`
+    const pt = getCoords(i)
+    curvePath += ` L ${pt.x},${pt.y}`
   }
 
-  // Define components for the 3 metrics
-  const items = [
-    { label: t('currentPrice'), val: currentPrice, color: '#f1f5f9', x: pCp.x, y: pCp.y, glow: false },
-    { label: t('fairPrice'), val: fairPrice, color: '#60a5fa', x: pFp.x, y: pFp.y, glow: true },
-    { label: t('analystTarget'), val: consensusTarget, color: '#fbbf24', x: pCt.x, y: pCt.y, glow: false }
+  // Smart Top/Bottom split positioning
+  const items: any[] = [
+    {
+      id: 'cp',
+      label: t('currentPrice'),
+      val: currentPrice,
+      color: '#f1f5f9',
+      x: pCp.x,
+      y: pCp.y,
+      glow: false,
+      isTop: !isUpside
+    },
+    {
+      id: 'fp',
+      label: t('fairPrice'),
+      val: fairPrice,
+      color: isUpside ? '#34d399' : '#f87171',
+      x: pFp.x,
+      y: pFp.y,
+      glow: true,
+      isTop: isUpside
+    }
   ]
 
-  // Sort items horizontally to calculate overlap staggering
-  const sortedItems = [...items].sort((a, b) => a.x - b.x)
-
-  // Staggering: if adjacent labels are closer than 65px horizontally, alternate heights
-  let levels = [0, 0, 0] // 0 = high level, 1 = low level
-  for (let i = 1; i < sortedItems.length; i++) {
-    if (sortedItems[i].x - sortedItems[i-1].x < 70) {
-      levels[i] = levels[i-1] === 0 ? 1 : 0
-    } else {
-      levels[i] = 0
-    }
+  if (hasConsensus && pCt) {
+    items.push({
+      id: 'ct',
+      label: t('analystTarget'),
+      val: consensusTarget,
+      color: '#fbbf24',
+      x: pCt.x,
+      y: pCt.y,
+      glow: false,
+      isTop: !isUpside
+    })
   }
 
-  const renderedItems = sortedItems.map((item, idx) => {
-    const isLowLevel = levels[idx] === 1
-    const yLineEnd = isLowLevel ? 122 : 98
-    const yTextName = isLowLevel ? 131 : 107
-    const yTextVal = isLowLevel ? 143 : 119
-    
-    // Clamp horizontal position so label pill doesn't clip boundaries (keep center X between 50 and 450)
-    const clampedX = Math.max(50, Math.min(450, item.x))
-    
-    return { ...item, yLineEnd, yTextName, yTextVal, clampedX }
+  const renderedItems = items.map((item) => {
+    const clampedX = Math.max(58, Math.min(442, item.x))
+    if (item.isTop) {
+      // Positioned ABOVE the curve
+      const yLineEnd = 30
+      const yTextName = 14
+      const yTextVal = 26
+      return { ...item, clampedX, yLineEnd, yTextName, yTextVal }
+    } else {
+      // Positioned BELOW the curve
+      const yLineEnd = 118
+      const yTextName = 132
+      const yTextVal = 144
+      return { ...item, clampedX, yLineEnd, yTextName, yTextVal }
+    }
   })
 
   return (
-    <div className="bg-slate-950/40 border border-slate-850 rounded-2xl p-4 space-y-3">
-      <div className="flex justify-between items-center text-xs">
+    <div className="bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-cyan-500/25 rounded-2xl p-4 space-y-3 shadow-xl">
+      <div className="flex justify-between items-center text-xs flex-wrap gap-2">
         <span className="font-bold text-slate-300">{t('consensusVsFair')}</span>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-          isUpside 
-            ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' 
-            : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
-        }`}>
-          {isUpside 
-            ? `+${upsidePct}% ${language === 'KO' ? '적정가 괴리율' : 'Upside'}` 
-            : `-${upsidePct}% ${language === 'KO' ? '적정가 괴리율' : 'Downside'}`}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {!hasConsensus && (
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-800">
+              {language === 'KO' ? '증권사 목표가: 데이터 없음' : language === 'VI' ? 'Mục tiêu CTCK: Không có dữ liệu' : 'Analyst Target: No Data'}
+            </span>
+          )}
+          <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
+            isUpside 
+              ? 'bg-blue-500/20 border-blue-400/40 text-blue-300' 
+              : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
+          }`}>
+            {language === 'KO'
+              ? `적정가와 ${isUpside ? '+' : '-'}${upsidePct}% 차이 (${isUpside ? '저평가' : '고평가'})`
+              : language === 'VI'
+              ? `Chênh lệch ${isUpside ? '+' : '-'}${upsidePct}% (${isUpside ? 'Định giá thấp' : 'Định giá cao'})`
+              : `${isUpside ? '+' : '-'}${upsidePct}% vs Fair Value (${isUpside ? 'Undervalued' : 'Overvalued'})`}
+          </span>
+        </div>
       </div>
 
       <div className="relative">
         <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto select-none">
           <defs>
             <linearGradient id="curveGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
-              <stop offset="50%" stopColor="#10b981" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.4" />
+              {isUpside ? (
+                <>
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.5" />
+                  <stop offset="60%" stopColor="#10b981" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#34d399" stopOpacity="0.9" />
+                </>
+              ) : (
+                <>
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.5" />
+                  <stop offset="60%" stopColor="#f43f5e" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#e11d48" stopOpacity="0.9" />
+                </>
+              )}
             </linearGradient>
           </defs>
 
@@ -1313,18 +2219,18 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
             strokeLinecap="round"
           />
 
-          {/* Dashed guidelines for each dot down to the label levels */}
+          {/* Dashed guidelines extending to Top or Bottom */}
           {renderedItems.map((item, idx) => (
             <line
               key={idx}
               x1={item.x}
-              y1={item.y + 6}
+              y1={item.isTop ? item.y - 6 : item.y + 6}
               x2={item.x}
-              y2={item.yLineEnd - 12}
+              y2={item.yLineEnd}
               stroke={item.color}
               strokeWidth="1.2"
               strokeDasharray="2,2"
-              opacity="0.4"
+              opacity="0.5"
             />
           ))}
 
@@ -1335,10 +2241,10 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
                 <circle
                   cx={item.x}
                   cy={item.y}
-                  r="8"
+                  r="9"
                   fill="#60a5fa"
-                  opacity="0.35"
-                  className="animate-ping"
+                  opacity="0.3"
+                  className="animate-pulse"
                 />
               )}
               <circle
@@ -1352,27 +2258,29 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
             </g>
           ))}
 
-          {/* Render Staggered Labels with clamping to prevent boundary clipping */}
+          {/* Render Non-colliding Labels with High-contrast Pill Background */}
           {renderedItems.map((item, idx) => (
             <g key={idx}>
-              {/* Semi-transparent label background to ensure readability */}
+              {/* High-contrast label background pill */}
               <rect
-                x={item.clampedX - 52}
-                y={item.yTextName - 9}
-                width="104"
-                height="24"
-                rx="5"
-                fill="#020617"
-                fillOpacity="0.75"
+                x={item.clampedX - 54}
+                y={item.yTextName - 10}
+                width="108"
+                height="26"
+                rx="6"
+                fill="#050811"
+                fillOpacity="0.9"
+                stroke="#1e293b"
+                strokeWidth="1"
               />
               
-              {/* Guide circle at label line end */}
+              {/* Guide circle at label line anchor */}
               <circle
                 cx={item.x}
-                cy={item.yLineEnd - 12}
+                cy={item.yLineEnd}
                 r="2"
                 fill={item.color}
-                opacity="0.7"
+                opacity="0.8"
               />
 
               {/* Metric Title Label */}
@@ -1380,10 +2288,10 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
                 x={item.clampedX}
                 y={item.yTextName}
                 fill={item.color}
-                fontSize="8.5"
-                fontWeight="black"
+                fontSize="9"
+                fontWeight="900"
                 textAnchor="middle"
-                className="tracking-wider uppercase font-sans"
+                className="tracking-tight uppercase font-sans"
               >
                 {item.label}
               </text>
@@ -1391,9 +2299,9 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
               <text
                 x={item.clampedX}
                 y={item.yTextVal}
-                fill="#f1f5f9"
-                fontSize="9.5"
-                fontWeight="bold"
+                fill="#f8fafc"
+                fontSize="10.5"
+                fontWeight="900"
                 textAnchor="middle"
                 className="font-mono"
               >
