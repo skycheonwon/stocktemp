@@ -517,22 +517,22 @@ export default function StockDetail() {
           const isUndervalued = priceGapPct >= 0
 
           return (
-            <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+            <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
               {/* Header: Title & Upside Badge */}
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
                   <span>💎</span>
                   <span>{language === 'KO' ? '주가 밸류에이션' : language === 'VI' ? 'Định giá cổ phiếu' : 'Price Valuation'}</span>
                 </span>
                 {!isAwaitingSync && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
                     {isDeficit && (
                       <span className="text-[9px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/25">
                         {language === 'KO' ? '순익적자 (BPS)' : 'BPS Basis'}
                       </span>
                     )}
                     {fairPrice > 0 && (
-                      <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
+                      <span className={`text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm ${
                         isUndervalued 
                           ? 'bg-blue-500/20 border-blue-400/40 text-blue-300' 
                           : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
@@ -551,58 +551,68 @@ export default function StockDetail() {
               {/* Vector Flow Body: [ 현재가 ] ──▶ [ 방향 & 괴리율 ] ──▶ [ AI 적정가 ] */}
               <div className="mt-4 pt-1">
                 {isAwaitingSync || fairPrice <= 0 ? (
-                  <div className="flex items-center justify-between py-4 px-2">
-                    <div className="text-left">
-                      <span className="text-[11px] text-slate-400 block">{language === 'KO' ? '현재가' : 'Current'}</span>
-                      <span className="text-2xl font-black font-mono text-slate-100">{isAwaitingSync ? '--' : `${stock.currency} ${currentPrice.toLocaleString()}`}</span>
+                  <div className="flex items-center justify-between py-3 sm:py-4 px-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                    <div className="text-left flex-1 min-w-0 overflow-hidden">
+                      <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">{language === 'KO' ? '현재가' : 'Current'}</span>
+                      <span className="text-xs min-[360px]:text-sm sm:text-lg lg:text-2xl font-black font-mono text-slate-100 truncate block">
+                        {isAwaitingSync ? '--' : `${stock.currency} ${currentPrice.toLocaleString()}`}
+                      </span>
                     </div>
-                    <div className="text-slate-500 font-bold text-sm">➔</div>
-                    <div className="text-right">
-                      <span className="text-[11px] text-slate-400 block">{language === 'KO' ? 'AI 적정가' : 'Fair Value'}</span>
-                      <span className="text-xl font-bold font-mono text-slate-400">N/A</span>
+                    <div className="text-slate-500 font-bold text-sm px-2 shrink-0">➔</div>
+                    <div className="text-right flex-1 min-w-0 overflow-hidden">
+                      <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">{language === 'KO' ? 'AI 적정가' : 'Fair Value'}</span>
+                      <span className="text-xs min-[360px]:text-sm sm:text-base lg:text-xl font-bold font-mono text-slate-400 truncate block">N/A</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+                  <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
                     {/* Left Box: 현재 시장가 */}
-                    <div className="flex-1 min-w-0 text-left">
+                    <div className="flex-1 min-w-0 text-left overflow-hidden">
                       <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
-                        <span className="whitespace-nowrap">{language === 'KO' ? '현재 주가' : 'Current Price'}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 inline-block" />
+                        <span className="truncate">{language === 'KO' ? '현재 주가' : 'Current Price'}</span>
                       </div>
-                      <div className="text-base sm:text-xl lg:text-2xl font-black font-mono text-slate-100 tracking-tight mt-0.5 whitespace-nowrap">
-                        {stock.currency} {currentPrice.toLocaleString()}
+                      <div 
+                        className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-slate-100 tracking-tight mt-0.5 truncate flex items-baseline gap-0.5 sm:gap-1"
+                        title={`${stock.currency} ${currentPrice.toLocaleString()}`}
+                      >
+                        <span className="text-[10px] sm:text-xs font-semibold text-slate-400 shrink-0">{stock.currency}</span>
+                        <span className="truncate">{currentPrice.toLocaleString()}</span>
                       </div>
                     </div>
 
                     {/* Center Vector Indicator with Trending Icon & Hover Zoom */}
                     <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
-                      <div className={`group flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-xl ${
+                      <div className={`group flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-105 hover:shadow-xl ${
                         isUndervalued 
                           ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25' 
                           : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
                       }`}>
                         {isUndervalued ? (
-                          <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                          <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
                         ) : (
-                          <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                          <TrendingDown className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
                         )}
-                        <span className="text-sm sm:text-base font-extrabold tracking-tight whitespace-nowrap">
+                        <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight whitespace-nowrap">
                           {isUndervalued ? `+${priceGapPct.toFixed(1)}%` : `${priceGapPct.toFixed(1)}%`}
                         </span>
                       </div>
                     </div>
 
                     {/* Right Box: AI 적정가 */}
-                    <div className="flex-1 min-w-0 text-right">
+                    <div className="flex-1 min-w-0 text-right overflow-hidden">
                       <div className="text-[10px] sm:text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-end gap-1">
-                        <span className="whitespace-nowrap">{language === 'KO' ? 'AI 적정가' : 'AI Fair Value'}</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
+                        <span className="truncate">{language === 'KO' ? 'AI 적정가' : 'AI Fair Value'}</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 inline-block" />
                       </div>
-                      <div className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 whitespace-nowrap ${
-                        isUndervalued ? 'text-cyan-400' : 'text-blue-400'
-                      }`}>
-                        {stock.currency} {Math.round(fairPrice).toLocaleString()}
+                      <div 
+                        className={`text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 truncate flex items-baseline justify-end gap-0.5 sm:gap-1 ${
+                          isUndervalued ? 'text-cyan-400' : 'text-blue-400'
+                        }`}
+                        title={`${stock.currency} ${Math.round(fairPrice).toLocaleString()}`}
+                      >
+                        <span className="text-[10px] sm:text-xs font-semibold opacity-75 shrink-0">{stock.currency}</span>
+                        <span className="truncate">{Math.round(fairPrice).toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -613,15 +623,15 @@ export default function StockDetail() {
         })()}
 
         {/* Master Card 2: 금리 대비 수익률 (스마트 벡터 플로우) */}
-        <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+        <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
           {/* Header: Title & Status Badge */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
               <span>⚡</span>
               <span>{language === 'KO' ? '금리 대비 수익률' : language === 'VI' ? 'Lợi suất so với Lãi suất' : 'Yield vs Base Rate'}</span>
             </span>
             {!isAwaitingSync && (
-              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
+              <span className={`text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm ${
                 isPositiveSpread 
                   ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
                   : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
@@ -637,43 +647,43 @@ export default function StockDetail() {
 
           {/* Vector Flow Body: [ 국가 기준금리 ] ──▶ [ 마진 갭 ] ──▶ [ 기업 기대수익률 ] */}
           <div className="mt-4 pt-1">
-            <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-3 sm:p-4">
+            <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
               {/* Left Box: 기준금리 */}
-              <div className="flex-1 min-w-0 text-left">
+              <div className="flex-1 min-w-0 text-left overflow-hidden">
                 <div className="text-[10px] sm:text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
-                  <span className="whitespace-nowrap">{language === 'KO' ? `기준금리(${stock.country})` : `Base Rate(${stock.country})`}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 inline-block" />
+                  <span className="truncate">{language === 'KO' ? `기준금리(${stock.country})` : `Base Rate(${stock.country})`}</span>
                 </div>
-                <div className="text-base sm:text-xl lg:text-2xl font-black font-mono text-amber-400 tracking-tight mt-0.5 whitespace-nowrap">
+                <div className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-amber-400 tracking-tight mt-0.5 truncate">
                   {baseRate}
                 </div>
               </div>
 
               {/* Center Vector Indicator with Trending Icon & Hover Zoom */}
               <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
-                <div className={`group flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-110 hover:shadow-xl ${
+                <div className={`group flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-105 hover:shadow-xl ${
                   isPositiveSpread 
                     ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25' 
                     : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
                 }`}>
                   {isPositiveSpread ? (
-                    <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                    <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
                   ) : (
-                    <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                    <TrendingDown className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
                   )}
-                  <span className="text-sm sm:text-base font-extrabold tracking-tight whitespace-nowrap">
+                  <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight whitespace-nowrap">
                     {isPositiveSpread ? `+${yieldSpread.toFixed(2)}%p` : `${yieldSpread.toFixed(2)}%p`}
                   </span>
                 </div>
               </div>
 
               {/* Right Box: 기업 기대수익률 */}
-              <div className="flex-1 min-w-0 text-right">
+              <div className="flex-1 min-w-0 text-right overflow-hidden">
                 <div className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-end gap-1">
-                  <span className="whitespace-nowrap">{language === 'KO' ? '기업 기대수익률' : 'Earnings Yield'}</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                  <span className="truncate">{language === 'KO' ? '기업 기대수익률' : 'Earnings Yield'}</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 inline-block" />
                 </div>
-                <div className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 whitespace-nowrap ${
+                <div className={`text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 truncate ${
                   isPositiveSpread ? 'text-emerald-400' : 'text-slate-100'
                 }`}>
                   {isAwaitingSync ? '--' : `${expectedReturn}%`}
@@ -821,41 +831,43 @@ export default function StockDetail() {
         </div>
 
         {/* Right Column: Custom Financial Charts Dashboard (Lg: 8/12) */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Top: Consensus vs Fair Value Comparison Section */}
-          {isAwaitingSync ? (
-            <div className="flex flex-col items-center justify-center h-48 border border-dashed border-slate-800 bg-slate-950/10 rounded-3xl p-6 text-center space-y-2">
-              <span className="text-2xl">📊</span>
-              <p className="text-xs text-slate-400 font-bold">
-                {language === 'KO' ? '비교 차트 생성 대기 중' : language === 'VI' ? 'Đang tạo biểu đồ so sánh' : 'Comparison Chart Pending'}
-              </p>
-              <p className="text-[10px] text-slate-500 leading-relaxed max-w-xs">
-                {language === 'KO' ? '주가와 재무 데이터 동기화가 완료되면 가치산정 비교 차트가 시각화됩니다.' : 'The comparison chart will visualize fair price relative to current market price once synced.'}
-              </p>
-            </div>
-          ) : isDeficit || fairPrice <= 0 ? (
-            <div className="flex flex-col items-center justify-center h-44 bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-slate-800/80 rounded-2xl p-6 text-center space-y-2 shadow-xl">
-              <p className="text-sm text-slate-200 font-extrabold">
-                {language === 'KO' ? '적정가 산정불가 (적자기업)' : language === 'VI' ? 'Không thể tính giá hợp lý (Doanh nghiệp thua lỗ)' : 'Fair Price Not Applicable (Deficit Company)'}
-              </p>
-              <p className="text-[11px] text-slate-400 leading-relaxed max-w-sm">
-                {language === 'KO' 
-                  ? '당기순손실(EPS 음수) 기업은 P/E 기반의 적정주가가 산정되지 않습니다. BPS 추이를 참고해 주세요.' 
-                  : 'P/E-based fair price is not applicable for companies with negative earnings. Please refer to BPS trend.'}
-              </p>
-            </div>
-          ) : (
-            <ConsensusCompareChart stock={stock} currentPrice={currentPrice} fairPrice={fairPrice} language={language} t={t} />
-          )}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* Consensus vs Fair Value Comparison Section (Desktop: Top / Mobile: Below EPS & BPS) */}
+          <div className="order-2 lg:order-1">
+            {isAwaitingSync ? (
+              <div className="flex flex-col items-center justify-center h-48 border border-dashed border-slate-800 bg-slate-950/10 rounded-3xl p-6 text-center space-y-2">
+                <span className="text-2xl">📊</span>
+                <p className="text-xs text-slate-400 font-bold">
+                  {language === 'KO' ? '비교 차트 생성 대기 중' : language === 'VI' ? 'Đang tạo biểu đồ so sánh' : 'Comparison Chart Pending'}
+                </p>
+                <p className="text-[10px] text-slate-500 leading-relaxed max-w-xs">
+                  {language === 'KO' ? '주가와 재무 데이터 동기화가 완료되면 가치산정 비교 차트가 시각화됩니다.' : 'The comparison chart will visualize fair price relative to current market price once synced.'}
+                </p>
+              </div>
+            ) : isDeficit || fairPrice <= 0 ? (
+              <div className="flex flex-col items-center justify-center h-44 bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-slate-800/80 rounded-2xl p-6 text-center space-y-2 shadow-xl">
+                <p className="text-sm text-slate-200 font-extrabold">
+                  {language === 'KO' ? '적정가 산정불가 (적자기업)' : language === 'VI' ? 'Không thể tính giá hợp lý (Doanh nghiệp thua lỗ)' : 'Fair Price Not Applicable (Deficit Company)'}
+                </p>
+                <p className="text-[11px] text-slate-400 leading-relaxed max-w-sm">
+                  {language === 'KO' 
+                    ? '당기순손실(EPS 음수) 기업은 P/E 기반의 적정주가가 산정되지 않습니다. BPS 추이를 참고해 주세요.' 
+                    : 'P/E-based fair price is not applicable for companies with negative earnings. Please refer to BPS trend.'}
+                </p>
+              </div>
+            ) : (
+              <ConsensusCompareChart stock={stock} currentPrice={currentPrice} fairPrice={fairPrice} language={language} t={t} />
+            )}
+          </div>
 
-          {/* Bottom: Quarterly EPS & BPS Financial Trend Charts */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Quarterly EPS & BPS Financial Trend Charts (Mobile: Top / Desktop: Below Consensus Chart) */}
+          <div className="order-1 lg:order-2 grid grid-cols-1 md:grid-cols-2 gap-6">
             <CustomRevenueEpsChart stock={stock} currentEps={currentEps} language={language} t={t} />
             <CustomBpsChart stock={stock} currentPrice={currentPrice} t={t} />
           </div>
 
           {/* Regulatory In-line Disclaimer (Vietnamese Securities Law & Global Compliance) */}
-          <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs sm:text-[13px] font-medium text-slate-300 leading-relaxed select-none shadow-sm">
+          <div className="order-3 lg:order-3 flex items-start gap-2.5 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs sm:text-[13px] font-medium text-slate-300 leading-relaxed select-none shadow-sm">
             <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
             <p>
               {language === 'KO'
@@ -2116,9 +2128,7 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
       glowColor: '#f1f5f9',
       bgGlow: 'from-slate-500/10 to-transparent',
       x: pCp.x,
-      y: pCp.y,
-      diffText: language === 'KO' ? '현재 기준' : language === 'VI' ? 'Giá hiện tại' : 'Current Base',
-      diffClass: 'text-slate-400'
+      y: pCp.y
     },
     {
       id: 'fp',
@@ -2129,19 +2139,11 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
       glowColor: isUpside ? '#34d399' : '#f87171',
       bgGlow: isUpside ? 'from-emerald-500/10 to-transparent' : 'from-rose-500/10 to-transparent',
       x: pFp.x,
-      y: pFp.y,
-      diffText: language === 'KO'
-        ? `${isUpside ? '+' : '-'}${upsidePct}% (${isUpside ? '저평가' : '고평가'})`
-        : language === 'VI'
-        ? `${isUpside ? '+' : '-'}${upsidePct}% (${isUpside ? 'Định giá thấp' : 'Định giá cao'})`
-        : `${isUpside ? '+' : '-'}${upsidePct}% (${isUpside ? 'Undervalued' : 'Overvalued'})`,
-      diffClass: isUpside ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'
+      y: pFp.y
     }
   ]
 
   if (hasConsensus && pCt) {
-    const ctDiffPct = (((consensusTarget - currentPrice) / (currentPrice || 1)) * 100).toFixed(1)
-    const isCtUpside = consensusTarget >= currentPrice
     allItems.push({
       id: 'ct',
       label: t('analystTarget'),
@@ -2151,13 +2153,7 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
       glowColor: '#fbbf24',
       bgGlow: 'from-amber-500/10 to-transparent',
       x: pCt.x,
-      y: pCt.y,
-      diffText: language === 'KO'
-        ? `${isCtUpside ? '+' : ''}${ctDiffPct}% 상승여력`
-        : language === 'VI'
-        ? `${isCtUpside ? '+' : ''}${ctDiffPct}% Tiềm năng`
-        : `${isCtUpside ? '+' : ''}${ctDiffPct}% Upside`,
-      diffClass: isCtUpside ? 'text-amber-400 font-bold' : 'text-slate-400'
+      y: pCt.y
     })
   }
 
@@ -2266,56 +2262,31 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
       </div>
 
       {/* Standardized Summary Cards (Order matches the curve dots exactly) */}
-      <div className={`grid gap-2.5 ${hasConsensus ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+      <div className={`grid gap-1.5 sm:gap-2.5 ${hasConsensus ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {sortedItems.map((item) => (
           <div
             key={item.id}
-            className={`relative overflow-hidden rounded-xl p-3 bg-gradient-to-b ${item.bgGlow} bg-slate-900/60 border ${item.borderClass} shadow-md flex flex-col justify-between space-y-2 transition-all hover:bg-slate-900/90`}
+            className={`relative overflow-hidden rounded-xl p-2 sm:p-3 bg-gradient-to-b ${item.bgGlow} bg-slate-900/60 border ${item.borderClass} shadow-md flex flex-col justify-between space-y-1 sm:space-y-1.5 transition-all hover:bg-slate-900/90`}
           >
             {/* Top Row: Color Dot & Label */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                 <span
-                  className="w-2.5 h-2.5 rounded-full shadow-sm"
+                  className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full shadow-sm shrink-0"
                   style={{ backgroundColor: item.color }}
                 />
-                <span className="text-[11px] font-bold text-slate-300 tracking-tight">
+                <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 tracking-tight truncate">
                   {item.label}
                 </span>
               </div>
             </div>
 
             {/* Middle Row: Formatted Value */}
-            <div className="text-base sm:text-lg font-black font-mono tracking-tight text-white">
+            <div className="text-xs sm:text-base lg:text-lg font-black font-mono tracking-tight text-white whitespace-nowrap truncate">
               {currency} {Math.round(item.val).toLocaleString()}
-            </div>
-
-            {/* Bottom Row: Difference Tag / Sub-info */}
-            <div className="text-[11px] flex items-center gap-1">
-              <span className={item.diffClass}>
-                {item.diffText}
-              </span>
             </div>
           </div>
         ))}
-
-        {/* Fallback card if consensus target is missing */}
-        {!hasConsensus && (
-          <div className="rounded-xl p-3 bg-slate-950/40 border border-dashed border-slate-800 flex flex-col justify-between space-y-2 opacity-60">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-600" />
-              <span className="text-[11px] font-bold text-slate-400">
-                {t('analystTarget')}
-              </span>
-            </div>
-            <div className="text-sm font-semibold text-slate-500">
-              {language === 'KO' ? '데이터 없음' : language === 'VI' ? 'Không có dữ liệu' : 'No Data Available'}
-            </div>
-            <div className="text-[11px] text-slate-600">
-              -
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
