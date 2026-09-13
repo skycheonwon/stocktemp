@@ -822,11 +822,7 @@ export default function StockDetail() {
 
         {/* Right Column: Custom Financial Charts Dashboard (Lg: 8/12) */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <CustomRevenueEpsChart stock={stock} currentEps={currentEps} language={language} t={t} />
-            <CustomBpsChart stock={stock} currentPrice={currentPrice} t={t} />
-          </div>
-          
+          {/* Top: Consensus vs Fair Value Comparison Section */}
           {isAwaitingSync ? (
             <div className="flex flex-col items-center justify-center h-48 border border-dashed border-slate-800 bg-slate-950/10 rounded-3xl p-6 text-center space-y-2">
               <span className="text-2xl">📊</span>
@@ -851,6 +847,12 @@ export default function StockDetail() {
           ) : (
             <ConsensusCompareChart stock={stock} currentPrice={currentPrice} fairPrice={fairPrice} language={language} t={t} />
           )}
+
+          {/* Bottom: Quarterly EPS & BPS Financial Trend Charts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CustomRevenueEpsChart stock={stock} currentEps={currentEps} language={language} t={t} />
+            <CustomBpsChart stock={stock} currentPrice={currentPrice} t={t} />
+          </div>
 
           {/* Regulatory In-line Disclaimer (Vietnamese Securities Law & Global Compliance) */}
           <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs sm:text-[13px] font-medium text-slate-300 leading-relaxed select-none shadow-sm">
@@ -2046,9 +2048,9 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
   const isUpside = fairPrice >= currentPrice
   const upsidePct = Math.abs(((fairPrice - currentPrice) / (currentPrice || 1)) * 100).toFixed(1)
 
-  // SVG parameters for the S-curve
+  // SVG parameters for the clean S-curve
   const svgWidth = 500
-  const svgHeight = 160
+  const svgHeight = 64
   const paddingX = 40
   const chartWidth = svgWidth - paddingX * 2
 
@@ -2056,10 +2058,10 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
   const getCoords = (pct: number) => {
     const t = Math.max(0, Math.min(1, pct / 100))
     const x = paddingX + t * chartWidth
-    // S-curve cosine mapping (SVG y=0 is top, y=160 is bottom):
+    // S-curve cosine mapping (centered around y=32):
     const y = isUpside 
-      ? (60 + 20 * Math.cos(Math.PI * t)) 
-      : (60 - 20 * Math.cos(Math.PI * t))
+      ? (32 + 14 * Math.cos(Math.PI * t)) 
+      : (32 - 14 * Math.cos(Math.PI * t))
     return { x, y }
   }
 
@@ -2096,71 +2098,80 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
   const pCt = hasConsensus ? getCoords(ctPct) : null
 
   // Generate smooth curve path
-  const startY = isUpside ? 80 : 40
+  const startY = isUpside ? 46 : 18
   let curvePath = `M ${paddingX},${startY}`
   for (let i = 1; i <= 100; i++) {
     const pt = getCoords(i)
     curvePath += ` L ${pt.x},${pt.y}`
   }
 
-  // Smart Top/Bottom split positioning
-  const items: any[] = [
+  // Define price items with their coordinates and styles
+  const allItems: any[] = [
     {
       id: 'cp',
       label: t('currentPrice'),
       val: currentPrice,
       color: '#f1f5f9',
+      borderClass: 'border-slate-700/70',
+      glowColor: '#f1f5f9',
+      bgGlow: 'from-slate-500/10 to-transparent',
       x: pCp.x,
       y: pCp.y,
-      glow: false,
-      isTop: !isUpside
+      diffText: language === 'KO' ? '현재 기준' : language === 'VI' ? 'Giá hiện tại' : 'Current Base',
+      diffClass: 'text-slate-400'
     },
     {
       id: 'fp',
       label: t('fairPrice'),
       val: fairPrice,
       color: isUpside ? '#34d399' : '#f87171',
+      borderClass: isUpside ? 'border-emerald-500/40' : 'border-rose-500/40',
+      glowColor: isUpside ? '#34d399' : '#f87171',
+      bgGlow: isUpside ? 'from-emerald-500/10 to-transparent' : 'from-rose-500/10 to-transparent',
       x: pFp.x,
       y: pFp.y,
-      glow: true,
-      isTop: isUpside
+      diffText: language === 'KO'
+        ? `${isUpside ? '+' : '-'}${upsidePct}% (${isUpside ? '저평가' : '고평가'})`
+        : language === 'VI'
+        ? `${isUpside ? '+' : '-'}${upsidePct}% (${isUpside ? 'Định giá thấp' : 'Định giá cao'})`
+        : `${isUpside ? '+' : '-'}${upsidePct}% (${isUpside ? 'Undervalued' : 'Overvalued'})`,
+      diffClass: isUpside ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'
     }
   ]
 
   if (hasConsensus && pCt) {
-    items.push({
+    const ctDiffPct = (((consensusTarget - currentPrice) / (currentPrice || 1)) * 100).toFixed(1)
+    const isCtUpside = consensusTarget >= currentPrice
+    allItems.push({
       id: 'ct',
       label: t('analystTarget'),
       val: consensusTarget,
       color: '#fbbf24',
+      borderClass: 'border-amber-500/40',
+      glowColor: '#fbbf24',
+      bgGlow: 'from-amber-500/10 to-transparent',
       x: pCt.x,
       y: pCt.y,
-      glow: false,
-      isTop: !isUpside
+      diffText: language === 'KO'
+        ? `${isCtUpside ? '+' : ''}${ctDiffPct}% 상승여력`
+        : language === 'VI'
+        ? `${isCtUpside ? '+' : ''}${ctDiffPct}% Tiềm năng`
+        : `${isCtUpside ? '+' : ''}${ctDiffPct}% Upside`,
+      diffClass: isCtUpside ? 'text-amber-400 font-bold' : 'text-slate-400'
     })
   }
 
-  const renderedItems = items.map((item) => {
-    const clampedX = Math.max(58, Math.min(442, item.x))
-    if (item.isTop) {
-      // Positioned ABOVE the curve
-      const yLineEnd = 30
-      const yTextName = 14
-      const yTextVal = 26
-      return { ...item, clampedX, yLineEnd, yTextName, yTextVal }
-    } else {
-      // Positioned BELOW the curve
-      const yLineEnd = 118
-      const yTextName = 132
-      const yTextVal = 144
-      return { ...item, clampedX, yLineEnd, yTextName, yTextVal }
-    }
-  })
+  // Sort items from left-to-right to match exactly the dots on the curve
+  const sortedItems = [...allItems].sort((a, b) => a.x - b.x)
 
   return (
-    <div className="bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-cyan-500/25 rounded-2xl p-4 space-y-3 shadow-xl">
+    <div className="bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-cyan-500/25 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
+      {/* Header Bar */}
       <div className="flex justify-between items-center text-xs flex-wrap gap-2">
-        <span className="font-bold text-slate-300">{t('consensusVsFair')}</span>
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          <span className="font-bold text-slate-200 text-sm">{t('consensusVsFair')}</span>
+        </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           {!hasConsensus && (
             <span className="text-[10px] font-bold text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded-full border border-slate-800">
@@ -2169,7 +2180,7 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
           )}
           <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm ${
             isUpside 
-              ? 'bg-blue-500/20 border-blue-400/40 text-blue-300' 
+              ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300' 
               : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
           }`}>
             {language === 'KO'
@@ -2181,19 +2192,20 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
         </div>
       </div>
 
-      <div className="relative">
-        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto select-none">
+      {/* Clean S-Curve SVG with only highlight dots */}
+      <div className="relative py-1">
+        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto select-none overflow-visible">
           <defs>
             <linearGradient id="curveGrad" x1="0" y1="0" x2="1" y2="0">
               {isUpside ? (
                 <>
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.5" />
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
                   <stop offset="60%" stopColor="#10b981" stopOpacity="0.8" />
                   <stop offset="100%" stopColor="#34d399" stopOpacity="0.9" />
                 </>
               ) : (
                 <>
-                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.5" />
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
                   <stop offset="60%" stopColor="#f43f5e" stopOpacity="0.8" />
                   <stop offset="100%" stopColor="#e11d48" stopOpacity="0.9" />
                 </>
@@ -2206,7 +2218,7 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
             d={curvePath}
             fill="none"
             stroke="#090d16"
-            strokeWidth="8"
+            strokeWidth="7"
             strokeLinecap="round"
           />
 
@@ -2215,101 +2227,95 @@ function ConsensusCompareChart({ stock, currentPrice, fairPrice, language, t }: 
             d={curvePath}
             fill="none"
             stroke="url(#curveGrad)"
-            strokeWidth="4"
+            strokeWidth="3.5"
             strokeLinecap="round"
           />
 
-          {/* Dashed guidelines extending to Top or Bottom */}
-          {renderedItems.map((item, idx) => (
-            <line
-              key={idx}
-              x1={item.x}
-              y1={item.isTop ? item.y - 6 : item.y + 6}
-              x2={item.x}
-              y2={item.yLineEnd}
-              stroke={item.color}
-              strokeWidth="1.2"
-              strokeDasharray="2,2"
-              opacity="0.5"
-            />
-          ))}
-
-          {/* Render Dot Markers */}
-          {items.map((item, idx) => (
+          {/* Render Pure Highlight Dots on the Curve */}
+          {allItems.map((dot, idx) => (
             <g key={idx}>
-              {item.glow && (
-                <circle
-                  cx={item.x}
-                  cy={item.y}
-                  r="9"
-                  fill="#60a5fa"
-                  opacity="0.3"
-                  className="animate-pulse"
-                />
-              )}
+              {/* Outer pulsing aura glow */}
               <circle
-                cx={item.x}
-                cy={item.y}
-                r="5.5"
-                fill={item.color}
-                stroke="#020617"
+                cx={dot.x}
+                cy={dot.y}
+                r="10"
+                fill={dot.color}
+                opacity="0.25"
+                className="animate-pulse"
+              />
+              {/* Outer stroke rim */}
+              <circle
+                cx={dot.x}
+                cy={dot.y}
+                r="6"
+                fill={dot.color}
+                stroke="#030712"
                 strokeWidth="2.5"
               />
-            </g>
-          ))}
-
-          {/* Render Non-colliding Labels with High-contrast Pill Background */}
-          {renderedItems.map((item, idx) => (
-            <g key={idx}>
-              {/* High-contrast label background pill */}
-              <rect
-                x={item.clampedX - 54}
-                y={item.yTextName - 10}
-                width="108"
-                height="26"
-                rx="6"
-                fill="#050811"
-                fillOpacity="0.9"
-                stroke="#1e293b"
-                strokeWidth="1"
-              />
-              
-              {/* Guide circle at label line anchor */}
+              {/* Center shiny core dot */}
               <circle
-                cx={item.x}
-                cy={item.yLineEnd}
+                cx={dot.x}
+                cy={dot.y}
                 r="2"
-                fill={item.color}
-                opacity="0.8"
+                fill="#ffffff"
+                opacity="0.9"
               />
-
-              {/* Metric Title Label */}
-              <text
-                x={item.clampedX}
-                y={item.yTextName}
-                fill={item.color}
-                fontSize="9"
-                fontWeight="900"
-                textAnchor="middle"
-                className="tracking-tight uppercase font-sans"
-              >
-                {item.label}
-              </text>
-              {/* Metric Value */}
-              <text
-                x={item.clampedX}
-                y={item.yTextVal}
-                fill="#f8fafc"
-                fontSize="10.5"
-                fontWeight="900"
-                textAnchor="middle"
-                className="font-mono"
-              >
-                {currency} {Math.round(item.val).toLocaleString()}
-              </text>
             </g>
           ))}
         </svg>
+      </div>
+
+      {/* Standardized Summary Cards (Order matches the curve dots exactly) */}
+      <div className={`grid gap-2.5 ${hasConsensus ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+        {sortedItems.map((item) => (
+          <div
+            key={item.id}
+            className={`relative overflow-hidden rounded-xl p-3 bg-gradient-to-b ${item.bgGlow} bg-slate-900/60 border ${item.borderClass} shadow-md flex flex-col justify-between space-y-2 transition-all hover:bg-slate-900/90`}
+          >
+            {/* Top Row: Color Dot & Label */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="w-2.5 h-2.5 rounded-full shadow-sm"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-[11px] font-bold text-slate-300 tracking-tight">
+                  {item.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Middle Row: Formatted Value */}
+            <div className="text-base sm:text-lg font-black font-mono tracking-tight text-white">
+              {currency} {Math.round(item.val).toLocaleString()}
+            </div>
+
+            {/* Bottom Row: Difference Tag / Sub-info */}
+            <div className="text-[11px] flex items-center gap-1">
+              <span className={item.diffClass}>
+                {item.diffText}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        {/* Fallback card if consensus target is missing */}
+        {!hasConsensus && (
+          <div className="rounded-xl p-3 bg-slate-950/40 border border-dashed border-slate-800 flex flex-col justify-between space-y-2 opacity-60">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-600" />
+              <span className="text-[11px] font-bold text-slate-400">
+                {t('analystTarget')}
+              </span>
+            </div>
+            <div className="text-sm font-semibold text-slate-500">
+              {language === 'KO' ? '데이터 없음' : language === 'VI' ? 'Không có dữ liệu' : 'No Data Available'}
+            </div>
+            <div className="text-[11px] text-slate-600">
+              -
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
