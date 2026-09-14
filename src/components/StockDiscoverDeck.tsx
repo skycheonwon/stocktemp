@@ -1,16 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { 
-  RotateCcw, ChevronRight,
-  Sparkles, Zap
+  RotateCcw, Sparkles, Zap, TrendingUp, TrendingDown
 } from 'lucide-react'
 import type { Stock } from '../data/mockStocks'
 import { WeatherIcon } from './WeatherIcon'
+import WeatherCardAnimation from './WeatherCardAnimation'
 import { 
   calculateFairPrice, 
   calculateStockTemperature, 
-  getTemperatureDetails,
-  calculateExpectedReturn 
+  getTemperatureDetails
 } from '../utils/valuation'
 import { translateIndustry, getCountryName } from '../data/translations'
 import { useLanguage } from '../context/LanguageContext'
@@ -29,7 +28,18 @@ export default function StockDiscoverDeck({
 }: StockDiscoverDeckProps) {
   const { language, t } = useLanguage()
   const { prices, eps } = useLivePrices()
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const navigate = useNavigate()
+
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    try {
+      const lastViewedId = sessionStorage.getItem('stocktemp_last_viewed')
+      if (lastViewedId && stocks && stocks.length > 0) {
+        const foundIdx = stocks.findIndex(s => s.id === lastViewedId)
+        if (foundIdx >= 0) return foundIdx
+      }
+    } catch (e) {}
+    return 0
+  })
   const [history, setHistory] = useState<number[]>([])
 
   // Touch / Drag interaction states
@@ -39,8 +49,9 @@ export default function StockDiscoverDeck({
   
   const cardRef = useRef<HTMLDivElement>(null)
   const startPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const dragStartTimeRef = useRef<number>(0)
 
-  // Handle Card Dismiss (Swipe Left or Right to discard current card)
+  // Handle Card Dismiss (Swipe Left or Right)
   const triggerSwipe = useCallback((direction: 'left' | 'right') => {
     if (currentIndex >= stocks.length || flyOutDirection) return
     
@@ -65,7 +76,7 @@ export default function StockDiscoverDeck({
     setFlyOutDirection(null)
   }
 
-  // Keyboard navigation for desktop testing (Left/Right to dismiss, Backspace to undo)
+  // Keyboard navigation for testing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') triggerSwipe('left')
@@ -82,6 +93,7 @@ export default function StockDiscoverDeck({
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
     startPosRef.current = { x: clientX, y: clientY }
+    dragStartTimeRef.current = Date.now()
     setIsDragging(true)
   }
 
@@ -97,15 +109,28 @@ export default function StockDiscoverDeck({
   const handleTouchEnd = () => {
     if (!isDragging || flyOutDirection) return
     setIsDragging(false)
-    const horizontalThreshold = 80
+    const horizontalThreshold = 75
+    const dragDistance = Math.hypot(dragOffset.x, dragOffset.y)
+    const dragDuration = Date.now() - dragStartTimeRef.current
 
-    // Only horizontal swipes dismiss the card
+    // Tap/Click Detection -> Navigate to Stock Detail Page directly in Intuitive Mode
+    if (dragDistance < 8 && dragDuration < 300 && currentStock) {
+      try {
+        sessionStorage.setItem('stocktemp_scroll_y', String(window.scrollY))
+        sessionStorage.setItem('stocktemp_mobile_view_mode', 'deck')
+        sessionStorage.setItem('stocktemp_last_view_mode', 'deck')
+        sessionStorage.setItem('stocktemp_last_viewed', currentStock.id)
+      } catch (e) {}
+      navigate(`/stock/${currentStock.id}`)
+      return
+    }
+
     if (dragOffset.x > horizontalThreshold) {
       triggerSwipe('right')
     } else if (dragOffset.x < -horizontalThreshold) {
       triggerSwipe('left')
     } else {
-      // Up & Down dragging is for peeking behind the card -> Always snap back smoothly to (0, 0)!
+      // Snap back to center
       setDragOffset({ x: 0, y: 0 })
     }
   }
@@ -115,21 +140,97 @@ export default function StockDiscoverDeck({
     const livePrice = prices[stock.ticker] ?? stock.currentPrice
     const liveEps = eps[stock.ticker] ?? stock.eps
     const isDeficit = liveEps <= 0
-    const currentPe = liveEps > 0 ? livePrice / liveEps : 0
     const fairPrice = calculateFairPrice(liveEps, stock.defaultTargetPe || 15, stock.bps, stock.pbr, livePrice)
     const temp = calculateStockTemperature(livePrice, fairPrice)
     const tempDetails = getTemperatureDetails(temp)
-    const expectedReturn = calculateExpectedReturn(currentPe)
+
+    // Price gap percentage identical to StockDetail valuation formula: ((fairPrice - currentPrice) / currentPrice) * 100
+    const priceGapPct = fairPrice > 0 ? ((fairPrice - livePrice) / livePrice) * 100 : 0
+    const isUndervalued = priceGapPct >= 0
+    const absGap = Math.abs(priceGapPct).toFixed(1)
+
     return {
       livePrice,
       liveEps,
       isDeficit,
-      currentPe,
       fairPrice,
       temp,
       tempDetails,
-      expectedReturn
+      priceGapPct,
+      isUndervalued,
+      absGap
     }
+  }
+
+  // Helper to render Center Valuation Difference Badge (Large 2-Tier Hero Layout)
+  const renderValuationDiffBadge = (data: ReturnType<typeof getStockCardData>) => {
+    if (data.fairPrice <= 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-3.5 px-6 rounded-3xl bg-gradient-to-b from-slate-900/90 via-slate-950/80 to-slate-955/90 border border-slate-750/60 shadow-xl backdrop-blur-xl w-full max-w-[270px] transform hover:scale-105 transition-all text-center">
+          {/* Top: Pure text without warning icon */}
+          <span className="font-black text-base sm:text-lg text-slate-200 tracking-tight">
+            {language === 'KO' 
+              ? '적정가 산정불가' 
+              : language === 'VI' 
+              ? 'Không thể tính giá' 
+              : 'Fair Price Not Applicable'}
+          </span>
+
+          {/* Bottom: Caption Subtext */}
+          <span className="text-[11px] font-bold text-slate-400 mt-1 tracking-wider">
+            {language === 'KO'
+              ? (data.isDeficit ? '당기순손실 (적자기업)' : '재무 데이터 분석 중')
+              : language === 'VI'
+              ? (data.isDeficit ? 'Doanh nghiệp thua lỗ' : 'Đang phân tích')
+              : (data.isDeficit ? 'Deficit Company' : 'Data Processing')}
+          </span>
+        </div>
+      )
+    }
+
+    if (data.isUndervalued) {
+      return (
+        <div className="flex flex-col items-center justify-center py-3.5 px-6 rounded-3xl bg-gradient-to-b from-emerald-950/80 via-teal-950/70 to-slate-950/90 border border-emerald-500/40 shadow-2xl shadow-emerald-500/20 backdrop-blur-xl w-full max-w-[270px] transform hover:scale-105 transition-all">
+          {/* Top: Large Arrow + Percentage */}
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-8 h-8 text-emerald-400 stroke-[2.8] animate-pulse" />
+            <span className="font-mono font-black text-3xl text-emerald-300 tracking-tight">
+              +{data.absGap}%
+            </span>
+          </div>
+
+          {/* Bottom: Caption Subtext */}
+          <span className="text-[11px] font-bold text-emerald-400/90 mt-1.5 tracking-wider uppercase">
+            {language === 'KO'
+              ? '적정가 대비 차이 (저평가)'
+              : language === 'VI'
+              ? 'Chênh lệch (Định giá thấp)'
+              : 'vs Fair Value (Undervalued)'}
+          </span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center py-3.5 px-6 rounded-3xl bg-gradient-to-b from-rose-950/80 via-red-950/70 to-slate-950/90 border border-rose-500/40 shadow-2xl shadow-rose-500/20 backdrop-blur-xl w-full max-w-[270px] transform hover:scale-105 transition-all">
+        {/* Top: Large Arrow + Percentage */}
+        <div className="flex items-center gap-2">
+          <TrendingDown className="w-8 h-8 text-rose-400 stroke-[2.8] animate-pulse" />
+          <span className="font-mono font-black text-3xl text-rose-300 tracking-tight">
+            -{data.absGap}%
+          </span>
+        </div>
+
+        {/* Bottom: Caption Subtext */}
+        <span className="text-[11px] font-bold text-rose-400/90 mt-1.5 tracking-wider uppercase">
+          {language === 'KO'
+            ? '적정가 대비 차이 (고평가)'
+            : language === 'VI'
+            ? 'Chênh lệch (Định giá cao)'
+            : 'vs Fair Value (Overvalued)'}
+        </span>
+      </div>
+    )
   }
 
   // End of Deck
@@ -156,7 +257,7 @@ export default function StockDiscoverDeck({
               setCurrentIndex(0)
               setHistory([])
             }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all cursor-pointer active:scale-95"
           >
             <RotateCcw className="w-4 h-4" />
             <span>{language === 'KO' ? '처음부터 다시 보기' : language === 'VI' ? 'Xem lại từ đầu' : 'Start Over'}</span>
@@ -181,7 +282,7 @@ export default function StockDiscoverDeck({
       : 'translate3d(-150%, 15px, 0) rotate(-22deg)'
     : `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${rotation}deg)`
 
-  // Rear Card Transform logic (scales up seamlessly to 1.0 when front card flies away)
+  // Rear Card Transform logic (Poker Peek & Squeeze experience!)
   const rearTransform = flyOutDirection
     ? 'scale(1) translateY(0px)'
     : isDragging
@@ -191,18 +292,21 @@ export default function StockDiscoverDeck({
   const rearOpacity = flyOutDirection ? 1 : isDragging ? 0.95 : 0.72
 
   return (
-    <div className="relative w-full max-w-sm mx-auto select-none py-1">
+    <div className="relative w-full max-w-sm mx-auto select-none flex flex-col justify-center my-auto py-1">
       {/* Top Header: Title, Undo, Progress Counter */}
-      <div className="flex items-center justify-between px-2 mb-2.5 text-[11px] text-slate-400 font-bold">
+      <div className="flex items-center justify-between px-2 mb-2 text-[11px] text-slate-400 font-bold">
         <span className="flex items-center gap-1.5 text-indigo-400">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>{language === 'KO' ? '탐색 덱' : 'Discover Deck'}</span>
+          <span>{language === 'KO' ? '직관형 탐색 덱' : 'Intuitive Deck'}</span>
         </span>
         <div className="flex items-center gap-2">
           {history.length > 0 && (
             <button
               type="button"
-              onClick={handleUndo}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleUndo()
+              }}
               className="flex items-center gap-1 text-[10px] text-slate-300 hover:text-white bg-slate-850 hover:bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700 transition-colors cursor-pointer active:scale-95"
             >
               <RotateCcw className="w-3 h-3 text-slate-400" />
@@ -215,8 +319,8 @@ export default function StockDiscoverDeck({
         </div>
       </div>
 
-      {/* Card Deck Viewport */}
-      <div className="relative h-[495px] w-full flex items-center justify-center">
+      {/* Card Deck Viewport (Poker Card Squeeze & Peek Container) */}
+      <div className="relative h-[485px] w-full flex items-center justify-center">
         {/* Background Card 2 (Bottom layer placeholder) */}
         {nextStock2 && (
           <div 
@@ -229,7 +333,7 @@ export default function StockDiscoverDeck({
           />
         )}
 
-        {/* Background Card 1 (Real Next Card - Peekable Poker Layer that seamlessly rises in place) */}
+        {/* Background Card 1 (Peekable Next Card) */}
         {nextStock1 && next1Data && (
           <div 
             key={`rear-${nextStock1.id}`}
@@ -241,13 +345,11 @@ export default function StockDiscoverDeck({
               transition: isDragging ? 'none' : 'transform 0.24s cubic-bezier(0.2, 0.8, 0.4, 1), opacity 0.24s ease-out'
             }}
           >
-            {/* Next Card Ambient Glow */}
-            <div 
-              className={`absolute -top-24 -right-24 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-20 bg-gradient-to-br ${next1Data.tempDetails.gradientClass}`}
-            />
+            {/* Weather Background Animation for Next Card */}
+            <WeatherCardAnimation temperature={next1Data.temp} />
 
-            {/* Next Card Top: Stock Identity & Temperature (Visible when pulling front card DOWN) */}
-            <div className="space-y-2">
+            {/* [1. Next Card Top: Visible when dragging front card DOWN] */}
+            <div className="relative z-10 space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
@@ -264,61 +366,42 @@ export default function StockDiscoverDeck({
                     </span>
                     {next1Data.isDeficit && (
                       <span className="text-[9px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/25">
-                        {language === 'KO' ? '⚠️ 순익적자(BPS)' : 'Deficit (BPS)'}
+                        {language === 'KO' ? '순익적자 (BPS)' : 'Deficit'}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Next Card Temperature Badge */}
+                {/* Temperature Badge & Compact Weather Icon Underneath */}
                 <div className="flex flex-col items-end shrink-0">
                   <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border font-black text-sm shadow-md ${next1Data.tempDetails.badgeColorClass}`}>
                     <WeatherIcon name={next1Data.tempDetails.iconName as any} className="w-4 h-4" />
                     <span className="font-mono">{next1Data.temp.toFixed(1)}°C</span>
                   </div>
-                  <span className="text-[10px] font-extrabold text-slate-400 mt-1">
+                  <span className="text-[10px] font-extrabold text-slate-400 mt-0.5">
                     {next1Data.tempDetails.label}
                   </span>
+                  {/* Subtle Weather Animation Icon Under Temperature */}
+                  <div className="mt-1.5 opacity-60 flex items-center justify-center">
+                    <WeatherIcon name={next1Data.tempDetails.iconName as any} className="w-6 h-6 animate-pulse" />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Next Card Center: Financial Metrics (EPS, Target P/E, ROE, PBR) */}
-            <div className="grid grid-cols-4 gap-2 text-center bg-slate-950/40 p-2.5 rounded-2xl border border-slate-800/60 text-xs my-2">
-              <div>
-                <span className="text-[9px] font-bold text-slate-500 uppercase block">EPS</span>
-                <span className="font-mono font-bold text-slate-200 text-[11px] mt-0.5 block truncate">
-                  {next1Data.liveEps > 0 ? (nextStock1.country === 'KR' ? `${Math.round(next1Data.liveEps).toLocaleString()}` : next1Data.liveEps.toFixed(1)) : '-'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] font-bold text-slate-500 uppercase block">목표 P/E</span>
-                <span className="font-mono font-bold text-indigo-400 text-[11px] mt-0.5 block">
-                  {nextStock1.defaultTargetPe || 15}x
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] font-bold text-slate-500 uppercase block">ROE</span>
-                <span className="font-mono font-bold text-emerald-400 text-[11px] mt-0.5 block">
-                  {nextStock1.roe !== undefined ? `${nextStock1.roe.toFixed(1)}%` : '-'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[9px] font-bold text-slate-500 uppercase block">PBR</span>
-                <span className="font-mono font-bold text-slate-200 text-[11px] mt-0.5 block">
-                  {nextStock1.pbr ? `${nextStock1.pbr.toFixed(2)}x` : '-'}
-                </span>
-              </div>
+            {/* [2. Next Card Center: Identical Valuation Difference Badge] */}
+            <div className="relative z-10 flex flex-col items-center justify-center my-auto py-3">
+              {renderValuationDiffBadge(next1Data)}
             </div>
 
-            {/* Next Card Bottom: Current Price vs Fair Price (Visible when pulling front card UP) */}
-            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-2.5">
-              <div className="grid grid-cols-2 gap-3">
+            {/* [3. Next Card Bottom: Visible when lifting front card UP (Poker Squeeze!)] */}
+            <div className="relative z-10 mt-auto w-full bg-slate-950/80 backdrop-blur-md border border-slate-800/90 rounded-2xl p-4 shadow-xl">
+              <div className="grid grid-cols-2 gap-4 text-center divide-x divide-slate-800/80">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight block">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight block">
                     {t('currentPrice')}
                   </span>
-                  <span className="text-base font-black font-mono text-slate-100 mt-0.5 block">
+                  <span className="text-xl font-black font-mono text-slate-100 mt-1 block">
                     {nextStock1.country === 'KR'
                       ? `${next1Data.livePrice.toLocaleString()}원`
                       : nextStock1.country === 'VN'
@@ -328,25 +411,22 @@ export default function StockDiscoverDeck({
                 </div>
 
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight block">
-                    {t('fairPrice')} (AI)
-                  </span>
-                  <span className={`text-base font-black font-mono mt-0.5 block ${next1Data.tempDetails.colorClass}`}>
+                  <div className="flex items-center justify-center gap-1">
+                    <Zap className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">
+                      {t('fairPrice')} (AI)
+                    </span>
+                  </div>
+                  <span className={`text-xl font-black font-mono mt-1 block ${next1Data.fairPrice > 0 ? next1Data.tempDetails.colorClass : 'text-slate-400 text-sm font-sans'}`}>
                     {next1Data.fairPrice > 0
                       ? (nextStock1.country === 'KR'
                         ? `${Math.round(next1Data.fairPrice).toLocaleString()}원`
                         : nextStock1.country === 'VN'
                         ? `${Math.round(next1Data.fairPrice).toLocaleString()} ₫`
                         : `$${next1Data.fairPrice.toFixed(2)}`)
-                      : 'N/A'}
+                      : (language === 'KO' ? '산정불가' : 'N/A')}
                   </span>
                 </div>
-              </div>
-
-              {/* Detail button placeholder */}
-              <div className="flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl bg-slate-800/60 text-slate-400 text-xs font-bold border border-slate-750">
-                <span>{language === 'KO' ? '상세 재무 / AI 토론 보기' : 'View Full Details & AI'}</span>
-                <ChevronRight className="w-3.5 h-3.5" />
               </div>
             </div>
           </div>
@@ -370,15 +450,13 @@ export default function StockDiscoverDeck({
             touchAction: 'none',
             cursor: isDragging ? 'grabbing' : 'grab'
           }}
-          className="absolute inset-0 bg-slate-900 border border-slate-750/90 rounded-3xl p-5 shadow-2xl flex flex-col justify-between overflow-hidden will-change-transform group"
+          className="absolute inset-0 bg-slate-900 border border-slate-750/90 rounded-3xl p-5 shadow-2xl flex flex-col justify-between overflow-hidden will-change-transform group cursor-pointer"
         >
-          {/* Ambient Weather Glow Aura */}
-          <div 
-            className={`absolute -top-24 -right-24 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-25 bg-gradient-to-br ${currentData.tempDetails.gradientClass}`}
-          />
+          {/* Weather Background Animation Component */}
+          <WeatherCardAnimation temperature={currentData.temp} />
 
-          {/* [1. 상단] 종목명 & 적정 밸류 (온도/상태 뱃지) */}
-          <div className="space-y-2">
+          {/* [1. 상단] 종목명 & 적정 밸류 (온도/상태 뱃지 & 밑으로 은은한 날씨 아이콘) */}
+          <div className="relative z-10 space-y-2">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
@@ -386,7 +464,7 @@ export default function StockDiscoverDeck({
                   <span className="text-slate-600">•</span>
                   <span className="truncate">{translateIndustry(currentStock.industry, language)}</span>
                 </span>
-                <h2 className="text-xl font-black text-slate-100 tracking-tight truncate mt-0.5">
+                <h2 className="text-xl font-black text-slate-100 tracking-tight truncate mt-0.5 group-hover:text-blue-300 transition-colors">
                   {language === 'KO' && currentStock.koreanName ? currentStock.koreanName : currentStock.name}
                 </h2>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -395,7 +473,7 @@ export default function StockDiscoverDeck({
                   </span>
                   {currentData.isDeficit && (
                     <span className="text-[9px] font-bold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/25">
-                      {language === 'KO' ? '⚠️ 순익적자 (BPS기준)' : 'Deficit (BPS Basis)'}
+                      {language === 'KO' ? '순익적자 (BPS기준)' : 'Deficit (BPS Basis)'}
                     </span>
                   )}
                 </div>
@@ -407,51 +485,33 @@ export default function StockDiscoverDeck({
                   <WeatherIcon name={currentData.tempDetails.iconName as any} className="w-4 h-4" />
                   <span className="font-mono">{currentData.temp.toFixed(1)}°C</span>
                 </div>
-                <span className="text-[10px] font-extrabold text-slate-400 mt-1">
+                <span className="text-[10px] font-extrabold text-slate-400 mt-0.5">
                   {currentData.tempDetails.label}
                 </span>
+
+                {/* Compact Weather Animation Icon Under Temperature with High Transparency */}
+                <div className="mt-1.5 opacity-60 flex items-center justify-center">
+                  <WeatherIcon name={currentData.tempDetails.iconName as any} className="w-6 h-6 animate-pulse" />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* [2. 중간] EPS & 핵심 밸류에이션 지표 */}
-          <div className="grid grid-cols-4 gap-2 text-center bg-slate-950/40 p-2.5 rounded-2xl border border-slate-850 text-xs my-2">
-            <div>
-              <span className="text-[9px] font-bold text-slate-400 uppercase block">EPS</span>
-              <span className="font-mono font-bold text-slate-100 text-[11px] mt-0.5 block truncate">
-                {currentData.liveEps > 0 
-                  ? (currentStock.country === 'KR' ? `${Math.round(currentData.liveEps).toLocaleString()}` : currentData.liveEps.toFixed(1)) 
-                  : '-'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[9px] font-bold text-slate-400 uppercase block">목표 P/E</span>
-              <span className="font-mono font-bold text-indigo-400 text-[11px] mt-0.5 block">
-                {currentStock.defaultTargetPe || 15}x
-              </span>
-            </div>
-            <div>
-              <span className="text-[9px] font-bold text-slate-400 uppercase block">ROE</span>
-              <span className="font-mono font-bold text-emerald-400 text-[11px] mt-0.5 block">
-                {currentStock.roe !== undefined ? `${currentStock.roe.toFixed(1)}%` : '-'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[9px] font-bold text-slate-400 uppercase block">PBR</span>
-              <span className="font-mono font-bold text-slate-200 text-[11px] mt-0.5 block">
-                {currentStock.pbr ? `${currentStock.pbr.toFixed(2)}x` : '-'}
-              </span>
+          {/* [2. 중간 핵심 HERO] 세부정보와 완벽 동일한 밸류에이션 뱃지 (꺾인 번개 화살표 + 0.00% 차이 저평가/고평가) */}
+          <div className="relative z-10 flex flex-col items-center justify-center my-auto py-3">
+            <div className="transform hover:scale-105 transition-transform">
+              {renderValuationDiffBadge(currentData)}
             </div>
           </div>
 
-          {/* [3. 하단] 현재주가 vs 적정주가 비교 & 상세 링크 */}
-          <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3.5 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+          {/* [3. 하단] 현재 주가 vs 적정 주가 (AI) 2열 카드 (카드 맨 하단 배치) */}
+          <div className="relative z-10 mt-auto w-full bg-slate-950/80 backdrop-blur-md border border-slate-800/90 rounded-2xl p-4 shadow-2xl">
+            <div className="grid grid-cols-2 gap-4 text-center divide-x divide-slate-800/80">
               <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight block">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight block">
                   {t('currentPrice')}
                 </span>
-                <span className="text-lg font-black font-mono text-slate-100 mt-0.5 block">
+                <span className="text-xl font-black font-mono text-slate-100 mt-1 block tracking-tight">
                   {currentStock.country === 'KR'
                     ? `${currentData.livePrice.toLocaleString()}원`
                     : currentStock.country === 'VN'
@@ -461,66 +521,23 @@ export default function StockDiscoverDeck({
               </div>
 
               <div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-indigo-400" />
+                <div className="flex items-center justify-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">
                     {t('fairPrice')} (AI)
                   </span>
                 </div>
-                {/* 적정주가 색상을 저평가/고평가/적정가 상태 색상과 동일하게 표시 */}
-                <span className={`text-lg font-black font-mono mt-0.5 block ${currentData.tempDetails.colorClass}`}>
+                <span className={`text-xl font-black font-mono mt-1 block tracking-tight ${currentData.fairPrice > 0 ? currentData.tempDetails.colorClass : 'text-slate-400 text-sm font-sans'}`}>
                   {currentData.fairPrice > 0
                     ? (currentStock.country === 'KR'
                       ? `${Math.round(currentData.fairPrice).toLocaleString()}원`
                       : currentStock.country === 'VN'
                       ? `${Math.round(currentData.fairPrice).toLocaleString()} ₫`
                       : `$${currentData.fairPrice.toFixed(2)}`)
-                    : 'N/A'}
+                    : (language === 'KO' ? '산정불가' : 'N/A')}
                 </span>
               </div>
             </div>
-
-            {/* 기대 수익률 밴드 (기준금리 대비 초과수익 표시) */}
-            {(() => {
-              const baseRate = currentStock.country === 'KR' ? 3.50 : currentStock.country === 'US' ? 5.25 : currentStock.country === 'VN' ? 4.50 : 3.35
-              const spread = Number((currentData.expectedReturn - baseRate).toFixed(1))
-              const isPositive = spread >= 0
-
-              return (
-                <div className="pt-2 border-t border-slate-850/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold text-slate-400">
-                      {t('expectedReturn')} (1/PER)
-                    </span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md ${
-                      isPositive ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25' : 'bg-rose-500/15 text-rose-300 border border-rose-500/25'
-                    }`}>
-                      {isPositive ? `✨ 금리+${spread}%p 초과` : `⚠️ 금리${spread}%p`}
-                    </span>
-                  </div>
-                  <span className={`font-mono font-black ${
-                    isPositive ? 'text-emerald-400' : 'text-slate-200'
-                  }`}>
-                    {currentData.expectedReturn.toFixed(1)}%
-                  </span>
-                </div>
-              )
-            })()}
-
-            {/* 적정가 밑에 상세 재무/토론 보기 링크 */}
-            <Link
-              to={`/stock/${currentStock.id}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                try {
-                  sessionStorage.setItem('stocktemp_last_view_mode', 'deck')
-                } catch (err) {}
-              }}
-              className="flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600/90 to-indigo-600/90 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-extrabold transition-all border border-blue-500/30 cursor-pointer shadow-md shadow-blue-500/10 active:scale-[0.98]"
-            >
-              <span>{language === 'KO' ? '상세 재무 / AI 토론 보기' : 'View Full Details & AI'}</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
         </div>
       </div>

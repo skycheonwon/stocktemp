@@ -449,11 +449,7 @@ export default function StockDetail() {
           <button
             type="button"
             onClick={() => {
-              if (window.history.length > 1) {
-                navigate(-1)
-              } else {
-                navigate('/')
-              }
+              navigate('/')
             }}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             title={t('backToDashboard')}

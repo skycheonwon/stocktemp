@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   Search, Flame, Snowflake, Plus, Wind, Sun, Zap,
@@ -107,10 +107,79 @@ export default function Dashboard() {
   const [myVotes, setMyVotes] = useState<any[]>([])
 
   // Mobile View Mode: Category List vs Tinder-style Discover Deck
-  const [mobileViewMode, setMobileViewMode] = useState<'list' | 'deck'>('list')
+  const [mobileViewMode, setMobileViewMode] = useState<'list' | 'deck'>(() => {
+    try {
+      const mode = sessionStorage.getItem('stocktemp_mobile_view_mode') || sessionStorage.getItem('stocktemp_last_view_mode')
+      return mode === 'deck' ? 'deck' : 'list'
+    } catch (e) {
+      return 'list'
+    }
+  })
+
+  const handleSelectDeckMode = () => {
+    setMobileViewMode('deck')
+    try {
+      sessionStorage.setItem('stocktemp_mobile_view_mode', 'deck')
+      sessionStorage.setItem('stocktemp_last_view_mode', 'deck')
+    } catch (e) {}
+
+    // When clicking '직관형', scroll so [분석형 | 직관형] switcher is positioned right at the top!
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const switcherEl = document.getElementById('mobile-view-mode-switcher')
+        if (switcherEl) {
+          switcherEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 30)
+    })
+  }
+
+  const handleSelectListMode = () => {
+    setMobileViewMode('list')
+    try {
+      sessionStorage.setItem('stocktemp_mobile_view_mode', 'list')
+      sessionStorage.setItem('stocktemp_last_view_mode', 'list')
+    } catch (e) {}
+
+    // When clicking '분석형', scroll so '최근 본 종목' (or analysis top) is positioned at the top!
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const target = document.getElementById('recent-stocks-bar') || document.getElementById('mobile-list-container')
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 30)
+    })
+  }
 
   // Mobile List 2-Tier Segmented Tab State (5-tier temperature + recommended)
-  const [mobileListTab, setMobileListTab] = useState<'extreme_cold' | 'cold' | 'fair' | 'hot' | 'extreme_hot' | 'recommended'>('cold')
+  const [mobileListTab, setMobileListTab] = useState<'extreme_cold' | 'cold' | 'fair' | 'hot' | 'extreme_hot' | 'recommended'>(() => {
+    try {
+      const savedTab = sessionStorage.getItem('stocktemp_mobile_list_tab')
+      if (savedTab) return savedTab as any
+    } catch (e) {}
+    return 'cold'
+  })
+
+  const handleSetMobileListTab = (tab: 'extreme_cold' | 'cold' | 'fair' | 'hot' | 'extreme_hot' | 'recommended') => {
+    setMobileListTab(tab)
+    try {
+      sessionStorage.setItem('stocktemp_mobile_list_tab', tab)
+    } catch (e) {}
+  }
+
+  // Instant synchronous scroll restoration before screen paint
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return
+    const savedScrollY = sessionStorage.getItem('stocktemp_scroll_y')
+    const lastViewedId = sessionStorage.getItem('stocktemp_last_viewed')
+    if (savedScrollY && lastViewedId) {
+      const scrollY = parseInt(savedScrollY, 10)
+      if (!isNaN(scrollY) && scrollY > 0) {
+        window.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior })
+      }
+    }
+  }, [])
 
   // Desktop 3-Column Independent 2-Tier Tab States
   const [col1Tab, setCol1Tab] = useState<'extreme_cold' | 'cold'>('extreme_cold')
@@ -364,6 +433,7 @@ export default function Dashboard() {
     if (typeof window === 'undefined') return
     const lastViewedId = sessionStorage.getItem('stocktemp_last_viewed')
     const lastViewMode = sessionStorage.getItem('stocktemp_last_view_mode')
+    const savedScrollY = sessionStorage.getItem('stocktemp_scroll_y')
     if (!lastViewedId || stocksWithMetrics.length === 0) return
 
     const targetStock = stocksWithMetrics.find(s => s.id === lastViewedId)
@@ -389,27 +459,27 @@ export default function Dashboard() {
           setCol3Tab('fair')
           setMobileListTab('fair')
         }
-      }
 
-      setHighlightedStockId(lastViewedId)
+        setHighlightedStockId(lastViewedId)
 
-      // Smooth scroll to card after render
-      const timer = setTimeout(() => {
-        const el = document.getElementById(`stock-card-${lastViewedId}`)
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // If savedScrollY was present, ensure position is maintained
+        if (savedScrollY) {
+          const y = parseInt(savedScrollY, 10)
+          if (!isNaN(y) && y > 0) {
+            window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+          }
         }
-      }, 350)
 
-      // Clear highlight after 3.5 seconds
-      const clearTimer = setTimeout(() => {
-        setHighlightedStockId(null)
-      }, 3500)
+        const clearTimer = setTimeout(() => {
+          setHighlightedStockId(null)
+        }, 3500)
 
-      return () => {
-        clearTimeout(timer)
-        clearTimeout(clearTimer)
+        return () => {
+          clearTimeout(clearTimer)
+        }
       }
+    } else if (lastViewMode === 'deck') {
+      setMobileViewMode('deck')
     }
   }, [stocksWithMetrics])
 
@@ -1074,8 +1144,8 @@ export default function Dashboard() {
         {renderAuthWidget(true)}
       </div>
 
-      {/* Welcome & Market Temperature Section - Full Width Card with 2-Column Grid */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-955 border border-slate-800/60 rounded-3xl p-6 md:p-8 relative overflow-hidden select-none">
+        {/* Welcome & Market Temperature Section - Full Width Card with 2-Column Grid */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-955 border border-slate-800/60 rounded-3xl p-6 md:p-8 relative overflow-hidden select-none">
         <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-36 h-36 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
         
@@ -1374,9 +1444,9 @@ export default function Dashboard() {
       {/* Main Lists Section (Coldest / Hottest / Recommended Lists) */}
       {!searchQuery && (
         <div className="space-y-6">
-          {/* Recently Viewed Quick Bar (Web & Mobile - Placed at Top) */}
+          {/* Recently Viewed Quick Bar (Placed ABOVE the mode switcher button for both Web & Mobile) */}
           {recentStocks.length > 0 && (
-            <div className="flex items-center justify-between p-3 px-4 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-xl shadow-black/20 overflow-hidden">
+            <div id="recent-stocks-bar" className="scroll-mt-20 flex items-center justify-between p-2.5 sm:p-3 px-3.5 sm:px-4 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl shadow-xl shadow-black/20 overflow-hidden">
               <div 
                 className="flex items-center gap-2.5 min-w-0 overflow-x-auto scrollbar-none no-scrollbar py-0.5 flex-1 overscroll-x-contain"
                 style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -1386,11 +1456,11 @@ export default function Dashboard() {
                   }
                 }}
               >
-                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 shrink-0 pr-3 border-r border-slate-800 select-none">
+                <span className="text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 shrink-0 pr-2.5 sm:pr-3 border-r border-slate-800 select-none">
                   <span className="text-amber-400">🕒</span>
                   <span className="whitespace-nowrap">{t('recentViewed')}</span>
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   {recentStocks.map((rs) => {
                     const fullStock = stocksWithMetrics.find(s => s.id === rs.id)
                     const temp = fullStock ? fullStock.temperature : null
@@ -1402,15 +1472,23 @@ export default function Dashboard() {
                       <Link
                         key={rs.id}
                         to={`/stock/${rs.id}`}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                        onClick={() => {
+                          try {
+                            sessionStorage.setItem('stocktemp_scroll_y', String(window.scrollY))
+                            sessionStorage.setItem('stocktemp_last_view_mode', 'list')
+                            sessionStorage.setItem('stocktemp_mobile_view_mode', 'list')
+                            sessionStorage.setItem('stocktemp_last_viewed', rs.id)
+                          } catch (e) {}
+                        }}
+                        className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shrink-0 ${
                           isCurHighlighted
                             ? 'bg-blue-500/25 border-blue-400 text-blue-200 shadow-md shadow-blue-500/25 scale-105'
                             : 'bg-slate-950/70 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white hover:bg-slate-900'
                         }`}
                       >
-                        <span className="truncate max-w-[120px]">{name}</span>
+                        <span className="truncate max-w-[100px] sm:max-w-[120px]">{name}</span>
                         {temp !== null && tempDetails && (
-                          <span className={`font-mono text-[10px] px-1.5 py-0.2 rounded-md ${tempDetails.badgeColorClass}`}>
+                          <span className={`font-mono text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded-md ${tempDetails.badgeColorClass}`}>
                             {temp.toFixed(1)}°C
                           </span>
                         )}
@@ -1426,20 +1504,20 @@ export default function Dashboard() {
                   setRecentStocks([])
                   localStorage.removeItem('stocktemp_recent_stocks')
                 }}
-                className="text-[10px] text-slate-500 hover:text-slate-300 ml-3 shrink-0 cursor-pointer underline hover:no-underline whitespace-nowrap"
+                className="text-[10px] text-slate-500 hover:text-slate-300 ml-2.5 sm:ml-3 shrink-0 cursor-pointer underline hover:no-underline whitespace-nowrap"
               >
-                {language === 'KO' ? '기록 삭제' : 'Clear'}
+                {language === 'KO' ? '삭제' : 'Clear'}
               </button>
             </div>
           )}
 
-          {/* Mobile View Mode Switcher (List View vs Tinder-style Swipe Discovery Deck) */}
-          <div className="lg:hidden">
+          {/* Mobile View Mode Switcher */}
+          <div id="mobile-view-mode-switcher" className="lg:hidden scroll-mt-20">
             <div className="p-[1px] bg-gradient-to-r from-blue-500/40 via-purple-500/40 to-pink-500/40 rounded-2xl shadow-lg">
               <div className="grid grid-cols-2 p-1 bg-slate-900/95 backdrop-blur-md rounded-2xl gap-1">
                 <button
                   type="button"
-                  onClick={() => setMobileViewMode('list')}
+                  onClick={handleSelectListMode}
                   className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     mobileViewMode === 'list'
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25'
@@ -1451,7 +1529,7 @@ export default function Dashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMobileViewMode('deck')}
+                  onClick={handleSelectDeckMode}
                   className={`py-2.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     mobileViewMode === 'deck'
                       ? 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/30'
@@ -1465,9 +1543,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Mobile Tinder-Style Discover Deck View */}
+          {/* Mobile Discover Deck View */}
           {mobileViewMode === 'deck' && (
-            <div className="lg:hidden">
+            <div id="mobile-deck-container" className="lg:hidden flex flex-col justify-center items-center w-full py-2">
               <StockDiscoverDeck
                 stocks={filteredStocks}
                 watchlistIds={watchlistIds}
@@ -1478,7 +1556,7 @@ export default function Dashboard() {
 
           {/* Mobile Traditional Category List View */}
           {mobileViewMode === 'list' && (
-            <div className="lg:hidden space-y-4">
+            <div id="mobile-list-container" className="lg:hidden space-y-4">
               {/* Mobile Category Tab Selector (2-Tier 3x2 Grid) */}
               <div className="space-y-2">
                 {/* Row 1: Low ~ Fair */}
@@ -1486,7 +1564,7 @@ export default function Dashboard() {
                   {/* 1. 극저평가 */}
                   <button
                     type="button"
-                    onClick={() => setMobileListTab('extreme_cold')}
+                    onClick={() => handleSetMobileListTab('extreme_cold')}
                     className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-w-0 ${
                       mobileListTab === 'extreme_cold'
                         ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm'
@@ -1505,7 +1583,7 @@ export default function Dashboard() {
               {/* 2. 저평가 */}
               <button
                 type="button"
-                onClick={() => setMobileListTab('cold')}
+                onClick={() => handleSetMobileListTab('cold')}
                 className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-w-0 ${
                   mobileListTab === 'cold'
                     ? 'bg-blue-500/20 text-blue-300 border border-blue-500/50 shadow-sm'
@@ -1524,7 +1602,7 @@ export default function Dashboard() {
               {/* 3. 적정가 */}
               <button
                 type="button"
-                onClick={() => setMobileListTab('fair')}
+                onClick={() => handleSetMobileListTab('fair')}
                 className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-w-0 ${
                   mobileListTab === 'fair'
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm'
@@ -1546,7 +1624,7 @@ export default function Dashboard() {
               {/* 4. 고평가 */}
               <button
                 type="button"
-                onClick={() => setMobileListTab('hot')}
+                onClick={() => handleSetMobileListTab('hot')}
                 className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-w-0 ${
                   mobileListTab === 'hot'
                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
@@ -1565,7 +1643,7 @@ export default function Dashboard() {
               {/* 5. 극고평가 */}
               <button
                 type="button"
-                onClick={() => setMobileListTab('extreme_hot')}
+                onClick={() => handleSetMobileListTab('extreme_hot')}
                 className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-w-0 ${
                   mobileListTab === 'extreme_hot'
                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50 shadow-sm'
@@ -1584,7 +1662,7 @@ export default function Dashboard() {
               {/* 6. 추천 */}
               <button
                 type="button"
-                onClick={() => setMobileListTab('recommended')}
+                onClick={() => handleSetMobileListTab('recommended')}
                 className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer min-w-0 ${
                   mobileListTab === 'recommended'
                     ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/50 shadow-sm'
@@ -2325,7 +2403,10 @@ function StockCard({ stock, rank, isHighlighted }: { stock: any; rank?: number; 
       to={`/stock/${stock.id}`}
       onClick={() => {
         try {
+          sessionStorage.setItem('stocktemp_scroll_y', String(window.scrollY))
           sessionStorage.setItem('stocktemp_last_view_mode', 'list')
+          sessionStorage.setItem('stocktemp_mobile_view_mode', 'list')
+          sessionStorage.setItem('stocktemp_last_viewed', stock.id)
         } catch (e) {}
       }}
       className={`group block rounded-2xl p-5 transition-all relative overflow-hidden ${
