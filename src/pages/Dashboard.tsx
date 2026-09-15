@@ -141,12 +141,12 @@ export default function Dashboard() {
       sessionStorage.setItem('stocktemp_last_view_mode', 'list')
     } catch (e) {}
 
-    // When clicking '분석형', scroll so '최근 본 종목' (or analysis top) is positioned at the top!
+    // When clicking '분석형', scroll so [분석형 | 직관형] switcher is positioned right at the top!
     requestAnimationFrame(() => {
       setTimeout(() => {
-        const target = document.getElementById('recent-stocks-bar') || document.getElementById('mobile-list-container')
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const switcherEl = document.getElementById('mobile-view-mode-switcher')
+        if (switcherEl) {
+          switcherEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
       }, 30)
     })
@@ -1545,7 +1545,7 @@ export default function Dashboard() {
 
           {/* Mobile Discover Deck View */}
           {mobileViewMode === 'deck' && (
-            <div id="mobile-deck-container" className="lg:hidden flex flex-col justify-center items-center w-full py-2">
+            <div id="mobile-deck-container" className="lg:hidden flex flex-col justify-center items-center w-full pt-1 pb-1">
               <StockDiscoverDeck
                 stocks={filteredStocks}
                 watchlistIds={watchlistIds}

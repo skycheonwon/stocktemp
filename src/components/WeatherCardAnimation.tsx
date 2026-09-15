@@ -14,24 +14,23 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
         {/* Ambient Glows */}
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-48 bg-rose-600/20 rounded-full blur-3xl animate-pulse" />
 
-        {/* Rising Fire Embers */}
+        {/* Rising Fire Embers (Negative Delay = smooth continuous flow without clumping at bottom) */}
         <div className="absolute inset-0">
-          {[...Array(14)].map((_, i) => {
-            const left = `${(i * 7.5 + (i % 3) * 5) % 95 + 2}%`
-            const delay = `${(i * 0.45) % 3.2}s`
-            const duration = `${2.2 + (i % 4) * 0.6}s`
-            const size = 3 + (i % 4) * 2
+          {[...Array(18)].map((_, i) => {
+            const left = `${(i * 5.8 + (i % 3) * 3.5) % 92 + 4}%`
+            const delay = `-${((i * 0.22) % 2.8).toFixed(2)}s`
+            const duration = `${2.1 + (i % 4) * 0.4}s`
+            const size = 3.5 + (i % 4) * 2
             return (
               <span
                 key={i}
-                className="absolute bottom-2 rounded-full bg-gradient-to-t from-yellow-300 via-orange-400 to-rose-500 animate-riseEmber shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+                className="absolute bottom-0 rounded-full bg-gradient-to-t from-yellow-300 via-orange-400 to-rose-500 animate-riseEmber shadow-[0_0_12px_rgba(251,146,60,1),0_0_6px_rgba(244,63,94,1)]"
                 style={{
                   left,
                   width: `${size}px`,
-                  height: `${size * 1.4}px`,
+                  height: `${size * 1.5}px`,
                   animationDelay: delay,
                   animationDuration: duration,
-                  opacity: 0.85
                 }}
               />
             )
@@ -41,18 +40,18 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
         <style>{`
           @keyframes riseEmber {
             0% {
-              transform: translateY(0) translateX(0) scale(1);
+              transform: translateY(0) translateX(0) scale(0.9);
               opacity: 0;
             }
-            20% {
-              opacity: 0.9;
+            12% {
+              opacity: 0.95;
             }
-            80% {
-              opacity: 0.6;
-              transform: translateY(-260px) translateX(${Math.sin(1) * 20}px) scale(0.7);
+            75% {
+              opacity: 0.85;
+              transform: translateY(-280px) translateX(${Math.sin(1) * 25}px) scale(0.8);
             }
             100% {
-              transform: translateY(-380px) translateX(-25px) scale(0.2);
+              transform: translateY(-460px) translateX(-30px) scale(0.2);
               opacity: 0;
             }
           }
@@ -110,21 +109,20 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
         <div className="absolute inset-0 bg-gradient-to-t from-emerald-950/40 via-teal-950/20 to-transparent" />
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-48 bg-emerald-500/15 rounded-full blur-3xl animate-pulse duration-1000" />
 
-        {/* Floating Gentle Sparkles / Breeze Particles */}
+        {/* Floating Gentle Sparkles / Breeze Particles (Negative Delay for instant natural distribution) */}
         <div className="absolute inset-0">
-          {[...Array(10)].map((_, i) => {
-            const left = `${(i * 10 + 5) % 90}%`
-            const delay = `${(i * 0.6) % 4}s`
-            const duration = `${3.5 + (i % 3) * 1}s`
+          {[...Array(12)].map((_, i) => {
+            const left = `${(i * 8.5 + 4) % 92}%`
+            const delay = `-${((i * 0.35) % 3.6).toFixed(2)}s`
+            const duration = `${3.2 + (i % 3) * 0.8}s`
             return (
               <span
                 key={i}
-                className="absolute rounded-full bg-emerald-400/70 animate-floatBreeze shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                className="absolute bottom-0 rounded-full bg-emerald-400/80 animate-floatBreeze shadow-[0_0_8px_rgba(52,211,153,0.9)]"
                 style={{
                   left,
-                  bottom: '10px',
-                  width: `${3 + (i % 3) * 1.5}px`,
-                  height: `${3 + (i % 3) * 1.5}px`,
+                  width: `${3.5 + (i % 3) * 1.5}px`,
+                  height: `${3.5 + (i % 3) * 1.5}px`,
                   animationDelay: delay,
                   animationDuration: duration,
                 }}
@@ -144,15 +142,15 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
               transform: translateY(0) translateX(0) scale(0.8);
               opacity: 0;
             }
-            30% {
-              opacity: 0.8;
+            20% {
+              opacity: 0.85;
             }
             70% {
-              opacity: 0.5;
-              transform: translateY(-180px) translateX(25px) scale(1.1);
+              opacity: 0.6;
+              transform: translateY(-220px) translateX(30px) scale(1.1);
             }
             100% {
-              transform: translateY(-300px) translateX(45px) scale(0.2);
+              transform: translateY(-380px) translateX(55px) scale(0.2);
               opacity: 0;
             }
           }
@@ -172,17 +170,17 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
         <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/50 via-blue-950/25 to-transparent" />
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-48 bg-cyan-500/20 rounded-full blur-3xl" />
 
-        {/* Falling Rain / Wind Streaks */}
+        {/* Falling Rain / Wind Streaks (Negative Delay for instant rainfall stream) */}
         <div className="absolute inset-0">
-          {[...Array(14)].map((_, i) => {
-            const left = `${(i * 7.2) % 95 + 2}%`
-            const delay = `${(i * 0.25) % 2.2}s`
-            const duration = `${1.2 + (i % 3) * 0.4}s`
-            const height = 18 + (i % 4) * 8
+          {[...Array(16)].map((_, i) => {
+            const left = `${(i * 6.5) % 95 + 2}%`
+            const delay = `-${((i * 0.15) % 1.8).toFixed(2)}s`
+            const duration = `${1.1 + (i % 3) * 0.3}s`
+            const height = 22 + (i % 4) * 8
             return (
               <span
                 key={i}
-                className="absolute -top-8 w-[1.5px] bg-gradient-to-b from-transparent via-cyan-300 to-blue-400 rounded-full animate-fallRain opacity-60"
+                className="absolute -top-8 w-[2px] bg-gradient-to-b from-transparent via-cyan-300 to-blue-400 rounded-full animate-fallRain opacity-85 shadow-[0_0_6px_rgba(34,211,238,0.8)]"
                 style={{
                   left,
                   height: `${height}px`,
@@ -201,14 +199,14 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
               transform: translateY(-20px) translateX(0) rotate(15deg);
               opacity: 0;
             }
-            30% {
-              opacity: 0.7;
+            20% {
+              opacity: 0.95;
             }
-            90% {
-              opacity: 0.6;
+            85% {
+              opacity: 0.85;
             }
             100% {
-              transform: translateY(450px) translateX(60px) rotate(15deg);
+              transform: translateY(480px) translateX(60px) rotate(15deg);
               opacity: 0;
             }
           }
@@ -228,24 +226,23 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-64 h-48 bg-cyan-400/20 rounded-full blur-3xl animate-pulse duration-1000" />
       <div className="absolute -bottom-10 -right-10 w-60 h-60 bg-blue-500/20 rounded-full blur-3xl" />
 
-      {/* Falling Snowflakes */}
+      {/* Falling Snowflakes (Negative Delay for instant snowfall atmosphere) */}
       <div className="absolute inset-0">
-        {[...Array(16)].map((_, i) => {
-          const left = `${(i * 6.5 + 2) % 96}%`
-          const delay = `${(i * 0.4) % 3.6}s`
-          const duration = `${3.2 + (i % 4) * 0.8}s`
-          const size = 3 + (i % 4) * 2
+        {[...Array(18)].map((_, i) => {
+          const left = `${(i * 5.8 + 2) % 96}%`
+          const delay = `-${((i * 0.22) % 2.8).toFixed(2)}s`
+          const duration = `${3.0 + (i % 4) * 0.7}s`
+          const size = 3.5 + (i % 4) * 2
           return (
             <span
               key={i}
-              className="absolute -top-6 rounded-full bg-white animate-fallSnow shadow-[0_0_8px_rgba(255,255,255,0.9)]"
+              className="absolute -top-6 rounded-full bg-white animate-fallSnow shadow-[0_0_10px_rgba(255,255,255,1),0_0_15px_rgba(147,197,253,0.8)]"
               style={{
                 left,
                 width: `${size}px`,
                 height: `${size}px`,
                 animationDelay: delay,
                 animationDuration: duration,
-                opacity: 0.85
               }}
             />
           )
@@ -258,15 +255,15 @@ export default function WeatherCardAnimation({ temperature }: WeatherCardAnimati
             transform: translateY(-20px) translateX(0) rotate(0deg);
             opacity: 0;
           }
-          20% {
-            opacity: 0.9;
+          15% {
+            opacity: 1;
           }
-          80% {
-            opacity: 0.7;
-            transform: translateY(380px) translateX(${Math.sin(1) * 30}px) rotate(180deg);
+          85% {
+            opacity: 0.85;
+            transform: translateY(400px) translateX(${Math.sin(1) * 30}px) rotate(180deg);
           }
           100% {
-            transform: translateY(480px) translateX(15px) rotate(360deg);
+            transform: translateY(490px) translateX(15px) rotate(360deg);
             opacity: 0;
           }
         }
