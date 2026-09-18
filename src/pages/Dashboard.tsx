@@ -26,6 +26,7 @@ import {
   getTemperatureDetails,
   calculateExpectedReturn,
 } from '../utils/valuation'
+import { getEtfDetails } from '../utils/etfValuation'
 
 const INDICES_CONFIG: { translationKey: TranslationKey; temp: number }[] = [
   { translationKey: 'kospi', temp: 37.1 },
@@ -391,10 +392,13 @@ export default function Dashboard() {
   // Prepare stocks with their calculated valuation metrics
   const stocksWithMetrics = useMemo(() => {
     return stocks.map((stock) => {
-      const currentPrice = prices[stock.id] || stock.currentPrice
-      const currentEps = eps[stock.id] || stock.eps
+      const currentPrice = prices[stock.id] || prices[stock.ticker] || stock.currentPrice
+      const currentEps = eps[stock.id] || eps[stock.ticker] || stock.eps
       const isDeficit = currentEps <= 0
-      const fairPrice = calculateFairPrice(currentEps, stock.defaultTargetPe, stock.bps, stock.pbr, currentPrice)
+      const etfInfo = getEtfDetails(stock, currentPrice, language)
+      const fairPrice = etfInfo
+        ? etfInfo.targetPrice1Y
+        : calculateFairPrice(currentEps, stock.defaultTargetPe, stock.bps, stock.pbr, currentPrice)
       const temperature = calculateStockTemperature(currentPrice, fairPrice)
       const currentPe = currentEps > 0 ? currentPrice / currentEps : 0
       const expectedReturn = calculateExpectedReturn(currentPe)
@@ -408,9 +412,10 @@ export default function Dashboard() {
         expectedReturn,
         tempDetails,
         isDeficit,
+        etfInfo,
       }
     })
-  }, [stocks, prices, eps])
+  }, [stocks, prices, eps, language])
 
   // Web/Desktop Recently Viewed Stocks & Auto-Scroll Highlight
   const [recentStocks, setRecentStocks] = useState<any[]>([])
@@ -428,7 +433,7 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Auto-restore last viewed stock (e.g. Nature Cell / 네이처셀) for both Web and Mobile
+  // Auto-restore last viewed stock (e.g. Nature Cell / KODEX 미국나스닥100) for both Web and Mobile
   useEffect(() => {
     if (typeof window === 'undefined') return
     const lastViewedId = sessionStorage.getItem('stocktemp_last_viewed')
@@ -438,6 +443,11 @@ export default function Dashboard() {
 
     const targetStock = stocksWithMetrics.find(s => s.id === lastViewedId)
     if (targetStock) {
+      // Ensure the country filter includes the target stock's country
+      if (selectedCountry !== 'ALL' && selectedCountry !== targetStock.country) {
+        setSelectedCountry(targetStock.country as any)
+      }
+
       if (lastViewMode === 'deck') {
         setMobileViewMode('deck')
       } else {
@@ -468,11 +478,18 @@ export default function Dashboard() {
           if (!isNaN(y) && y > 0) {
             window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
           }
+        } else {
+          setTimeout(() => {
+            const cardEl = document.getElementById(`stock-card-${lastViewedId}`)
+            if (cardEl) {
+              cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          }, 200)
         }
 
         const clearTimer = setTimeout(() => {
           setHighlightedStockId(null)
-        }, 3500)
+        }, 4000)
 
         return () => {
           clearTimeout(clearTimer)

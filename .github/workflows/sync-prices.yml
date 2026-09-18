@@ -1,9 +1,9 @@
-name: Sync Stock Prices & AI Analysis (Weekly)
+name: Sync Stock Prices (Daily Weekdays)
 
 on:
   schedule:
-    - cron: '0 0 * * 6'  # 매주 토요일 00:00 UTC = 오전 9시 KST / 오전 7시 베트남
-  workflow_dispatch:      # 수동 실행도 가능
+    - cron: '0 21 * * 1-5'  # 화~토 새벽: 21:00 UTC = 한국 새벽 6시 / 베트남 새벽 4시 (미국/한국/베트남 장마감 후)
+  workflow_dispatch:        # 수동 실행 가능
 
 jobs:
   sync:
@@ -24,9 +24,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install yfinance requests firebase-admin
 
-      - name: Run Price Sync + AI Analysis Script
+      - name: Run Price Sync Script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python scripts/sync_prices.py

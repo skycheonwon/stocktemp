@@ -395,6 +395,16 @@ const INDUSTRY_MAP: Record<string, IndustryDict> = {
     "EN": "Energy Services",
     "VI": "Dịch vụ năng lượng"
   },
+  "ETF": {
+    "KO": "ETF (지수·테마)",
+    "EN": "ETF & Index Funds",
+    "VI": "Quỹ ETF"
+  },
+  "ETF (지수·테마)": {
+    "KO": "ETF (지수·테마)",
+    "EN": "ETF & Index Funds",
+    "VI": "Quỹ ETF"
+  },
   "Financial Services": {
     "KO": "금융 서비스",
     "EN": "Financial Services",

@@ -24,13 +24,18 @@ export async function fetchLiveStockMetrics(
 ): Promise<LiveStockMetrics> {
   const formattedTicker = ticker.trim().toUpperCase();
 
-  // 1. Korea (KR) - Naver Mobile Integration via CORS proxies
+  // 1. Korea (KR) - Naver Polling & Integration via CORS proxies
   if (country === 'KR') {
+    const pollingUrl = `https://polling.finance.naver.com/api/realtime?query=SERVICE_ITEM:${formattedTicker}`;
     const naverUrl = `https://m.stock.naver.com/api/stock/${formattedTicker}/integration`;
     const proxyUrls = [
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(pollingUrl)}`,
+      `https://corsproxy.io/?url=${encodeURIComponent(pollingUrl)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(pollingUrl)}`,
       `https://api.allorigins.win/raw?url=${encodeURIComponent(naverUrl)}`,
       `https://corsproxy.io/?url=${encodeURIComponent(naverUrl)}`,
       `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(naverUrl)}`,
+      pollingUrl,
       naverUrl
     ];
 
@@ -39,8 +44,22 @@ export async function fetchLiveStockMetrics(
         const res = await fetch(pUrl, { signal: AbortSignal.timeout(3500) });
         if (res.ok) {
           const data = await res.json();
-          const infos = data.totalInfos || [];
           
+          // Check Naver Polling API response structure
+          const areas = data?.result?.areas || [];
+          if (areas.length > 0 && areas[0]?.datas?.length > 0) {
+            const item = areas[0].datas[0];
+            const price = parseNumber(item.nv || item.lastClosePrice || item.pcv);
+            const rawEps = parseNumber(item.eps || item.keps);
+            const eps = rawEps > 0 ? rawEps : (price > 0 ? Math.round(price / targetPe) : 0);
+            const bps = parseNumber(item.bps);
+            if (price > 0) {
+              return { currentPrice: price, eps, bps };
+            }
+          }
+
+          // Check Naver Integration API response structure
+          const infos = data.totalInfos || [];
           let price = 0;
           let eps = 0;
           let per = 0;

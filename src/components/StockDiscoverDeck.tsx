@@ -12,6 +12,7 @@ import {
   calculateStockTemperature, 
   getTemperatureDetails
 } from '../utils/valuation'
+import { getEtfDetails } from '../utils/etfValuation'
 import { translateIndustry, getCountryName } from '../data/translations'
 import { useLanguage } from '../context/LanguageContext'
 import { useLivePrices } from '../context/LivePriceContext'
@@ -134,7 +135,15 @@ export default function StockDiscoverDeck({
   const { prices, eps } = useLivePrices()
   const navigate = useNavigate()
 
-  const [selectedTheme, setSelectedTheme] = useState<DeckTheme>('leaders')
+  const [selectedTheme, setSelectedTheme] = useState<DeckTheme>(() => {
+    try {
+      const savedTheme = sessionStorage.getItem('stocktemp_deck_theme')
+      if (savedTheme && THEME_OPTIONS.some(opt => opt.id === savedTheme)) {
+        return savedTheme as DeckTheme
+      }
+    } catch (e) {}
+    return 'leaders'
+  })
   const [randomSeed, setRandomSeed] = useState(0)
 
   // Filter and sort stocks according to selected theme
@@ -201,8 +210,42 @@ export default function StockDiscoverDeck({
     }
   }, [stocks, selectedTheme, prices, eps, randomSeed])
 
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState<number>(() => {
+    try {
+      const savedIndex = sessionStorage.getItem('stocktemp_deck_index')
+      if (savedIndex !== null) {
+        const idx = parseInt(savedIndex, 10)
+        if (!isNaN(idx) && idx >= 0) return idx
+      }
+    } catch (e) {}
+    return 0
+  })
   const [history, setHistory] = useState<number[]>([])
+
+  // Restore current index based on last viewed stock if available
+  const hasRestoredRef = useRef(false)
+  useEffect(() => {
+    if (hasRestoredRef.current || deckStocks.length === 0) return
+    try {
+      const lastStockId = sessionStorage.getItem('stocktemp_deck_last_stock_id')
+      if (lastStockId) {
+        const foundIdx = deckStocks.findIndex(s => s.id === lastStockId)
+        if (foundIdx !== -1) {
+          setCurrentIndex(foundIdx)
+          hasRestoredRef.current = true
+          return
+        }
+      }
+      const savedIdx = sessionStorage.getItem('stocktemp_deck_index')
+      if (savedIdx !== null) {
+        const idx = parseInt(savedIdx, 10)
+        if (!isNaN(idx) && idx >= 0 && idx < deckStocks.length) {
+          setCurrentIndex(idx)
+        }
+      }
+      hasRestoredRef.current = true
+    } catch (e) {}
+  }, [deckStocks])
 
   // Touch / Drag interaction states
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -223,6 +266,11 @@ export default function StockDiscoverDeck({
     setHistory([])
     setDragOffset({ x: 0, y: 0 })
     setFlyOutDirection(null)
+    try {
+      sessionStorage.setItem('stocktemp_deck_theme', theme)
+      sessionStorage.setItem('stocktemp_deck_index', '0')
+      sessionStorage.removeItem('stocktemp_deck_last_stock_id')
+    } catch (e) {}
   }
 
   // Count helper for theme chips
@@ -272,7 +320,16 @@ export default function StockDiscoverDeck({
 
     setTimeout(() => {
       setHistory(prev => [...prev, currentIndex])
-      setCurrentIndex(prev => prev + 1)
+      setCurrentIndex(prev => {
+        const nextIdx = prev + 1
+        try {
+          sessionStorage.setItem('stocktemp_deck_index', String(nextIdx))
+          if (deckStocks[nextIdx]) {
+            sessionStorage.setItem('stocktemp_deck_last_stock_id', deckStocks[nextIdx].id)
+          }
+        } catch (e) {}
+        return nextIdx
+      })
       setFlyOutDirection(null)
       setDragOffset({ x: 0, y: 0 })
       setIsDragging(false)
@@ -287,6 +344,12 @@ export default function StockDiscoverDeck({
     setCurrentIndex(prevIndex)
     setDragOffset({ x: 0, y: 0 })
     setFlyOutDirection(null)
+    try {
+      sessionStorage.setItem('stocktemp_deck_index', String(prevIndex))
+      if (deckStocks[prevIndex]) {
+        sessionStorage.setItem('stocktemp_deck_last_stock_id', deckStocks[prevIndex].id)
+      }
+    } catch (e) {}
   }
 
   // Keyboard navigation for testing
@@ -300,9 +363,21 @@ export default function StockDiscoverDeck({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [triggerSwipe])
 
+  const isNavigatingRef = useRef(false)
+  const lastTouchTimeRef = useRef(0)
+
   // Touch / Mouse Handlers
   const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
-    if (flyOutDirection) return
+    if (flyOutDirection || isNavigatingRef.current) return
+
+    const isTouchEvent = 'touches' in e
+    if (isTouchEvent) {
+      lastTouchTimeRef.current = Date.now()
+    } else if (Date.now() - lastTouchTimeRef.current < 600) {
+      // Ignore synthetic mouse events fired right after touch events
+      return
+    }
+
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
     startPosRef.current = { x: clientX, y: clientY }
@@ -311,7 +386,12 @@ export default function StockDiscoverDeck({
   }
 
   const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDragging || flyOutDirection) return
+    if (!isDragging || flyOutDirection || isNavigatingRef.current) return
+
+    if (!('touches' in e) && Date.now() - lastTouchTimeRef.current < 600) {
+      return
+    }
+
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
     const deltaX = clientX - startPosRef.current.x
@@ -319,21 +399,29 @@ export default function StockDiscoverDeck({
     setDragOffset({ x: deltaX, y: deltaY })
   }
 
-  const handleTouchEnd = () => {
-    if (!isDragging || flyOutDirection) return
+  const handleTouchEnd = (e?: React.TouchEvent | React.MouseEvent) => {
+    if (e && !('touches' in e) && Date.now() - lastTouchTimeRef.current < 600) {
+      return
+    }
+
+    if (!isDragging || flyOutDirection || isNavigatingRef.current) return
     setIsDragging(false)
     const horizontalThreshold = 75
     const dragDistance = Math.hypot(dragOffset.x, dragOffset.y)
     const dragDuration = Date.now() - dragStartTimeRef.current
 
-    // Tap/Click Detection -> Navigate to Stock Detail Page directly in Intuitive Mode
+    // Tap/Click Detection -> Navigate to Stock Detail Page directly in Intuitive Mode (Single Execution Guard)
     if (dragDistance < 8 && dragDuration < 300 && currentStock) {
+      isNavigatingRef.current = true
       try {
         sessionStorage.setItem('stocktemp_scroll_y', String(window.scrollY))
         sessionStorage.setItem('stocktemp_mobile_view_mode', 'deck')
         sessionStorage.setItem('stocktemp_last_view_mode', 'deck')
         sessionStorage.setItem('stocktemp_last_viewed', currentStock.id)
-      } catch (e) {}
+        sessionStorage.setItem('stocktemp_deck_theme', selectedTheme)
+        sessionStorage.setItem('stocktemp_deck_index', String(currentIndex))
+        sessionStorage.setItem('stocktemp_deck_last_stock_id', currentStock.id)
+      } catch (err) {}
       navigate(`/stock/${currentStock.id}`)
       return
     }
@@ -350,15 +438,20 @@ export default function StockDiscoverDeck({
 
   // Helper to compute stock metrics
   const getStockCardData = (stock: Stock) => {
-    const livePrice = prices[stock.ticker] ?? stock.currentPrice
-    const liveEps = eps[stock.ticker] ?? stock.eps
+    const livePrice = prices[stock.id] ?? prices[stock.ticker] ?? stock.currentPrice
+    const liveEps = eps[stock.id] ?? eps[stock.ticker] ?? stock.eps
     const isDeficit = liveEps <= 0
-    const fairPrice = calculateFairPrice(liveEps, stock.defaultTargetPe || 15, stock.bps, stock.pbr, livePrice)
+    const etfInfo = getEtfDetails(stock, livePrice, language)
+    const fairPrice = etfInfo
+      ? etfInfo.targetPrice1Y
+      : calculateFairPrice(liveEps, stock.defaultTargetPe || 15, stock.bps, stock.pbr, livePrice)
     const temp = calculateStockTemperature(livePrice, fairPrice)
     const tempDetails = getTemperatureDetails(temp)
 
     // Price gap percentage identical to StockDetail valuation formula: ((fairPrice - currentPrice) / currentPrice) * 100
-    const priceGapPct = fairPrice > 0 ? ((fairPrice - livePrice) / livePrice) * 100 : 0
+    const priceGapPct = etfInfo
+      ? etfInfo.targetUpsidePct
+      : (fairPrice > 0 ? ((fairPrice - livePrice) / livePrice) * 100 : 0)
     const isUndervalued = priceGapPct >= 0
     const absGap = Math.abs(priceGapPct).toFixed(1)
 
@@ -371,7 +464,8 @@ export default function StockDiscoverDeck({
       tempDetails,
       priceGapPct,
       isUndervalued,
-      absGap
+      absGap,
+      etfInfo
     }
   }
 
@@ -504,6 +598,12 @@ export default function StockDiscoverDeck({
               onClick={() => {
                 setCurrentIndex(0)
                 setHistory([])
+                try {
+                  sessionStorage.setItem('stocktemp_deck_index', '0')
+                  if (deckStocks[0]) {
+                    sessionStorage.setItem('stocktemp_deck_last_stock_id', deckStocks[0].id)
+                  }
+                } catch (e) {}
               }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/25 transition-all cursor-pointer active:scale-95"
             >

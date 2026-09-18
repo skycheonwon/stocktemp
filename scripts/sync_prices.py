@@ -508,74 +508,7 @@ def main():
             batch.commit()
             
     print("\nPrice sync committed successfully!")
-    
-    if not GEMINI_API_KEY:
-        print("\nNo GEMINI_API_KEY found. Skipping AI analysis generation.")
-        print("Sync completed successfully!")
-        return
-    
-    # Generate AI analysis for ALL stocks in parallel using plain Gemini (no Search Grounding)
-    # This allows 15 RPM vs 1 RPM, enabling all 449 stocks in ~30 minutes
-    print(f"\nStarting parallel AI Investment Analysis generation for ALL {len(docs)} stocks...")
-    print("(Using plain Gemini API - no Search Grounding limit, ~15 RPM allowed)")
-    
-    ai_updates = []  # list of (stock_id, update_data)
-    ai_lock = threading.Lock()
-    
-    def process_ai_for_stock(doc):
-        stock_id = doc.id
-        stock_data = doc.to_dict()
-        country = stock_data.get("country", "")
-        ticker = stock_data.get("ticker", "")
-        name = stock_data.get("name", "")
-        korean_name = stock_data.get("koreanName", name)
-        industry = stock_data.get("industry", "General")
-        
-        # Use Korean name for better Korean-language analysis quality
-        display_name = korean_name if korean_name else name
-        
-        analysis_data, recommended_pe = generate_ai_analysis_reports_all_langs(
-            display_name, ticker, country, industry, GEMINI_API_KEY
-        )
-        
-        update_data = {}
-        if analysis_data.get("ko"):
-            update_data["latestNews_KO"] = analysis_data["ko"]
-        if analysis_data.get("en"):
-            update_data["latestNews_EN"] = analysis_data["en"]
-        if analysis_data.get("vi"):
-            update_data["latestNews_VI"] = analysis_data["vi"]
-            
-        if recommended_pe:
-            update_data["defaultTargetPe"] = recommended_pe
-            
-        return stock_id, update_data
-    
-    # Run with 5 parallel workers — each worker enforces 1.1s gap via gemini_lock
-    # Net throughput: ~5 / 1.1s = ~4.5 stocks/sec = all 449 stocks in ~100 seconds theoretically
-    # In practice with network latency: ~15-20 min for 449 stocks
-    completed = 0
-    failed = 0
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_stock = {executor.submit(process_ai_for_stock, doc): doc.id for doc in docs}
-        
-        for future in as_completed(future_to_stock):
-            stock_id = future_to_stock[future]
-            try:
-                res_id, update_data = future.result()
-                if update_data:
-                    stocks_ref.document(res_id).update(update_data)
-                    completed += 1
-                    print(f"--> [{completed}/{len(docs)}] Done: {res_id}")
-                else:
-                    failed += 1
-                    print(f"--> [{completed}/{len(docs)}] No data: {res_id}")
-            except Exception as exc:
-                failed += 1
-                print(f"--> AI analysis error for {stock_id}: {exc}")
-    
-    print(f"\nAI Analysis complete! {completed} succeeded, {failed} failed out of {len(docs)} stocks.")
-    print("\nSync completed successfully!")
+    print("Bulk price & financial synchronization finished with 0 AI token cost.")
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, Star, Zap, ThumbsUp, ThumbsDown, MessageSquare, 
   Trash2, Calendar, User, LogIn, ChevronDown, ChevronUp, Sparkles, Send, Info,
-  TrendingUp, TrendingDown 
+  TrendingUp, TrendingDown, Layers, Building2, Percent, CheckCircle2, Coins
 } from 'lucide-react'
 import { 
   doc, runTransaction, collection, query, where, onSnapshot, 
@@ -23,6 +23,7 @@ import {
 import { WeatherIcon } from '../components/WeatherIcon'
 import LoginInline from '../components/LoginInline'
 import OpinionReplies from '../components/OpinionReplies'
+import { getEtfDetails } from '../utils/etfValuation'
 
 export default function StockDetail() {
   const { id } = useParams<{ id: string }>()
@@ -422,6 +423,8 @@ export default function StockDetail() {
     tempVal: '-- °C',
   } : getLocalizedTempDetails(stockTemp, t)
 
+  const etfDetails = getEtfDetails(stock, currentPrice, language)
+
   const displayName = language === 'KO' ? (stock.koreanName || stock.name) : stock.name
   const baseRateNum = getBaseRateNumber(stock.country)
   const baseRate = `${baseRateNum.toFixed(2)}%`
@@ -449,7 +452,11 @@ export default function StockDetail() {
           <button
             type="button"
             onClick={() => {
-              navigate('/')
+              if (window.history.length > 1) {
+                navigate(-1)
+              } else {
+                navigate('/')
+              }
             }}
             className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             title={t('backToDashboard')}
@@ -458,7 +465,7 @@ export default function StockDetail() {
           </button>
           <div>
             <span className="text-xs font-bold text-slate-550 uppercase tracking-wider block">
-              {getCountryName(stock.country, language)} | {translateIndustry(stock.industry, language)}
+              {getCountryName(stock.country, language)} | {etfDetails ? (language === 'KO' ? 'ETF / 지수추종' : language === 'VI' ? 'Quỹ ETF' : 'ETF / Index Fund') : translateIndustry(stock.industry, language)}
             </span>
             <div className="flex items-center gap-2 mt-0.5">
               <h2 className="text-xl md:text-2xl font-black text-slate-100">
@@ -467,6 +474,11 @@ export default function StockDetail() {
               <span className="text-xs font-mono px-2 py-0.5 bg-slate-900 border border-slate-800 text-slate-400 rounded-lg">
                 {stock.ticker}
               </span>
+              {etfDetails && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  ETF
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -505,376 +517,698 @@ export default function StockDetail() {
         </div>
       )}
 
-      {/* Top 2-Card Master Deck: [1. 주가 밸류에이션 (현재가 ➔ 갭 ➔ 적정가)] & [2. 금리 대비 수익률 (기준금리 ➔ 마진 ➔ 기대수익)] */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Master Card 1: 주가 밸류에이션 (스마트 벡터 플로우) */}
-        {(() => {
-          const priceGapPct = fairPrice > 0 ? ((fairPrice - currentPrice) / currentPrice) * 100 : 0
-          const isUndervalued = priceGapPct >= 0
-
-          return (
-            <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
-              {/* Header: Title & Upside Badge */}
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-                  <span>💎</span>
-                  <span>{language === 'KO' ? '주가 밸류에이션' : language === 'VI' ? 'Định giá cổ phiếu' : 'Price Valuation'}</span>
-                </span>
-                {!isAwaitingSync && (
-                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    {isDeficit && (
-                      <span className="text-[9px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/25">
-                        {language === 'KO' ? '순익적자 (BPS)' : 'BPS Basis'}
-                      </span>
-                    )}
-                    {fairPrice > 0 && (
-                      <span className={`text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm ${
-                        isUndervalued 
-                          ? 'bg-blue-500/20 border-blue-400/40 text-blue-300' 
-                          : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
-                      }`}>
-                        {language === 'KO'
-                          ? `적정가와 ${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% 차이 (${isUndervalued ? '저평가' : '고평가'})`
-                          : language === 'VI'
-                          ? `Chênh lệch ${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% (${isUndervalued ? 'Định giá thấp' : 'Định giá cao'})`
-                          : `${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% vs Fair Value (${isUndervalued ? 'Undervalued' : 'Overvalued'})`}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Vector Flow Body: [ 현재가 ] ──▶ [ 방향 & 괴리율 ] ──▶ [ AI 적정가 ] */}
-              <div className="mt-4 pt-1">
-                {isAwaitingSync || fairPrice <= 0 ? (
-                  <div className="flex items-center justify-between py-3 sm:py-4 px-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
-                    <div className="text-left flex-1 min-w-0 overflow-hidden">
-                      <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">{language === 'KO' ? '현재가' : 'Current'}</span>
-                      <span className="text-xs min-[360px]:text-sm sm:text-lg lg:text-2xl font-black font-mono text-slate-100 truncate block">
-                        {isAwaitingSync ? '--' : `${stock.currency} ${currentPrice.toLocaleString()}`}
-                      </span>
-                    </div>
-                    <div className="text-slate-500 font-bold text-sm px-2 shrink-0">➔</div>
-                    <div className="text-right flex-1 min-w-0 overflow-hidden">
-                      <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">{language === 'KO' ? 'AI 적정가' : 'Fair Value'}</span>
-                      <span className="text-xs min-[360px]:text-sm sm:text-base lg:text-xl font-bold font-mono text-slate-400 truncate block">N/A</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
-                    {/* Left Box: 현재 시장가 */}
-                    <div className="flex-1 min-w-0 text-left overflow-hidden">
-                      <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 inline-block" />
-                        <span className="truncate">{language === 'KO' ? '현재 주가' : 'Current Price'}</span>
-                      </div>
-                      <div 
-                        className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-slate-100 tracking-tight mt-0.5 truncate flex items-baseline gap-0.5 sm:gap-1"
-                        title={`${stock.currency} ${currentPrice.toLocaleString()}`}
-                      >
-                        <span className="text-[10px] sm:text-xs font-semibold text-slate-400 shrink-0">{stock.currency}</span>
-                        <span className="truncate">{currentPrice.toLocaleString()}</span>
-                      </div>
-                    </div>
-
-                    {/* Center Vector Indicator with Trending Icon & Hover Zoom */}
-                    <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
-                      <div className={`group flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-105 hover:shadow-xl ${
-                        isUndervalued 
-                          ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25' 
-                          : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
-                      }`}>
-                        {isUndervalued ? (
-                          <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
-                        ) : (
-                          <TrendingDown className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
-                        )}
-                        <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight whitespace-nowrap">
-                          {isUndervalued ? `+${priceGapPct.toFixed(1)}%` : `${priceGapPct.toFixed(1)}%`}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Right Box: AI 적정가 */}
-                    <div className="flex-1 min-w-0 text-right overflow-hidden">
-                      <div className="text-[10px] sm:text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-end gap-1">
-                        <span className="truncate">{language === 'KO' ? 'AI 적정가' : 'AI Fair Value'}</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 inline-block" />
-                      </div>
-                      <div 
-                        className={`text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 truncate flex items-baseline justify-end gap-0.5 sm:gap-1 ${
-                          isUndervalued ? 'text-cyan-400' : 'text-blue-400'
-                        }`}
-                        title={`${stock.currency} ${Math.round(fairPrice).toLocaleString()}`}
-                      >
-                        <span className="text-[10px] sm:text-xs font-semibold opacity-75 shrink-0">{stock.currency}</span>
-                        <span className="truncate">{Math.round(fairPrice).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* Master Card 2: 금리 대비 수익률 (스마트 벡터 플로우) */}
-        <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
-          {/* Header: Title & Status Badge */}
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-              <span>⚡</span>
-              <span>{language === 'KO' ? '금리 대비 수익률' : language === 'VI' ? 'Lợi suất so với Lãi suất' : 'Yield vs Base Rate'}</span>
-            </span>
-            {!isAwaitingSync && (
-              <span className={`text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm ${
-                isPositiveSpread 
-                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
-                  : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
-              }`}>
-                {language === 'KO'
-                  ? `${isPositiveSpread ? '+' : ''}${yieldSpread.toFixed(2)}%p ${isPositiveSpread ? '여유' : '부족'}`
-                  : language === 'VI'
-                  ? `${isPositiveSpread ? '+' : ''}${yieldSpread.toFixed(2)}%p ${isPositiveSpread ? 'Dư thừa' : 'Thiếu hụt'}`
-                  : `${isPositiveSpread ? '+' : ''}${yieldSpread.toFixed(2)}%p ${isPositiveSpread ? 'Surplus' : 'Deficit'}`}
+      {/* Top 2-Card Master Deck: Stock vs ETF */}
+      {etfDetails ? (
+        /* ETF Top 2-Card Deck: [1. 🚀 12개월 목표 상승 여력] & [2. 💵 연 분배금 (배당 수익률)] */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* ETF Master Card 1: 🚀 12개월 목표 상승 여력 */}
+          <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                <span>🚀</span>
+                <span>{language === 'KO' ? '12개월 목표 상승 여력' : '12M Target Upside Potential'}</span>
               </span>
-            )}
-          </div>
+              <span className="text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm bg-emerald-500/20 border-emerald-400/40 text-emerald-300">
+                {language === 'KO' ? `증권사 컨센서스 +${etfDetails.targetUpsidePct}% 기대 📈` : `Consensus +${etfDetails.targetUpsidePct}% 📈`}
+              </span>
+            </div>
 
-          {/* Vector Flow Body: [ 국가 기준금리 ] ──▶ [ 마진 갭 ] ──▶ [ 기업 기대수익률 ] */}
-          <div className="mt-4 pt-1">
-            <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
-              {/* Left Box: 기준금리 */}
-              <div className="flex-1 min-w-0 text-left overflow-hidden">
-                <div className="text-[10px] sm:text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 inline-block" />
-                  <span className="truncate">{language === 'KO' ? `기준금리(${stock.country})` : `Base Rate(${stock.country})`}</span>
+            <div className="mt-4 pt-1">
+              <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
+                {/* Left Box: 현재 시장가 */}
+                <div className="flex-1 min-w-0 text-left overflow-hidden">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 inline-block" />
+                    <span className="truncate">{language === 'KO' ? '현재 시장가' : 'Market Price'}</span>
+                  </div>
+                  <div className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-slate-100 tracking-tight mt-0.5 truncate flex items-baseline gap-0.5 sm:gap-1">
+                    <span className="text-[10px] sm:text-xs font-semibold text-slate-400 shrink-0">{stock.currency}</span>
+                    <span className="truncate">{currentPrice.toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-amber-400 tracking-tight mt-0.5 truncate">
-                  {baseRate}
-                </div>
-              </div>
 
-              {/* Center Vector Indicator with Trending Icon & Hover Zoom */}
-              <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
-                <div className={`group flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-105 hover:shadow-xl ${
-                  isPositiveSpread 
-                    ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25' 
-                    : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
-                }`}>
-                  {isPositiveSpread ? (
-                    <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
-                  ) : (
-                    <TrendingDown className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
-                  )}
-                  <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight whitespace-nowrap">
-                    {isPositiveSpread ? `+${yieldSpread.toFixed(2)}%p` : `${yieldSpread.toFixed(2)}%p`}
+                {/* Center Vector Indicator */}
+                <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
+                  <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border shadow-lg font-black font-mono bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25">
+                    <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-400 shrink-0 stroke-[2.8]" />
+                    <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight whitespace-nowrap">
+                      +{etfDetails.targetUpsidePct}%
+                    </span>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">
+                    {language === 'KO' ? '목표 상승 여력' : 'Upside'}
                   </span>
                 </div>
-              </div>
 
-              {/* Right Box: 기업 기대수익률 */}
-              <div className="flex-1 min-w-0 text-right overflow-hidden">
-                <div className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-end gap-1">
-                  <span className="truncate">{language === 'KO' ? '기업 기대수익률' : 'Earnings Yield'}</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 inline-block" />
+                {/* Right Box: 12개월 목표 주가 */}
+                <div className="flex-1 min-w-0 text-right overflow-hidden">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center justify-end gap-1">
+                    <span className="truncate">{language === 'KO' ? '12개월 목표가' : '1Y Target'}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0 inline-block" />
+                  </div>
+                  <div className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-indigo-300 tracking-tight mt-0.5 truncate flex items-baseline justify-end gap-0.5 sm:gap-1">
+                    <span className="text-[10px] sm:text-xs font-semibold text-indigo-400 shrink-0">{stock.currency}</span>
+                    <span className="truncate">{etfDetails.targetPrice1Y.toLocaleString()}</span>
+                  </div>
                 </div>
-                <div className={`text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 truncate ${
-                  isPositiveSpread ? 'text-emerald-400' : 'text-slate-100'
-                }`}>
-                  {isAwaitingSync ? '--' : `${expectedReturn}%`}
+              </div>
+            </div>
+          </div>
+
+          {/* ETF Master Card 2: 💵 연 분배금 (배당 수익률) */}
+          <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                <span>💵</span>
+                <span>{language === 'KO' ? '연 분배금 (배당 수익률)' : 'Dividend & Distribution Yield'}</span>
+              </span>
+              <span className="text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm bg-indigo-500/20 border-indigo-400/40 text-indigo-300">
+                {language === 'KO' ? '계좌 자동 입금 현금 배당 💰' : 'Cash Dividend Payout'}
+              </span>
+            </div>
+
+            <div className="mt-4 pt-1">
+              <div className="relative flex items-center justify-between gap-2 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
+                {/* 1. 총보수 (운용 수수료) */}
+                <div className="flex-1 min-w-0 text-left overflow-hidden">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <Percent className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span className="truncate">{language === 'KO' ? '총보수(운용)' : 'Expense'}</span>
+                  </div>
+                  <div className="text-xs min-[360px]:text-sm sm:text-base md:text-lg font-black font-mono text-amber-400 tracking-tight mt-0.5 truncate">
+                    {etfDetails.expenseRatio}
+                  </div>
+                </div>
+
+                <div className="h-8 w-px bg-slate-800 shrink-0"></div>
+
+                {/* 2. 분배 주기 */}
+                <div className="flex-1 min-w-0 text-center overflow-hidden">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center justify-center gap-1">
+                    <Calendar className="w-3 h-3 text-blue-400 shrink-0" />
+                    <span className="truncate">{language === 'KO' ? '분배 주기' : 'Frequency'}</span>
+                  </div>
+                  <div className="text-xs min-[360px]:text-sm sm:text-base md:text-lg font-black font-mono text-blue-300 tracking-tight mt-0.5 truncate">
+                    {etfDetails.dividendFrequency.split(' ')[0]}
+                  </div>
+                </div>
+
+                <div className="h-8 w-px bg-slate-800 shrink-0"></div>
+
+                {/* 3. 연 분배율 (배당 수익률) */}
+                <div className="flex-1 min-w-0 text-right overflow-hidden">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-end gap-1">
+                    <Coins className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span className="truncate">{language === 'KO' ? '연 분배율(배당)' : 'Div. Yield'}</span>
+                  </div>
+                  <div className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl font-black font-mono text-emerald-400 tracking-tight mt-0.5 truncate">
+                    {etfDetails.dividendYield}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* Regular Stock Top 2-Card Master Deck */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Master Card 1: 주가 밸류에이션 (스마트 벡터 플로우) */}
+          {(() => {
+            const priceGapPct = fairPrice > 0 ? ((fairPrice - currentPrice) / currentPrice) * 100 : 0
+            const isUndervalued = priceGapPct >= 0
 
-      {/* Middle Layout: Interactive Valuation Slider & SVG Charts Dashboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-        
-        {/* Left Column: AI Valuation & Stock Temperature Summary Card (Lg: 4/12) */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 shadow-2xl flex flex-col justify-between h-full">
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-60"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+            return (
+              <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
+                {/* Header: Title & Upside Badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                    <span>💎</span>
+                    <span>{language === 'KO' ? '주가 밸류에이션' : language === 'VI' ? 'Định giá cổ phiếu' : 'Price Valuation'}</span>
                   </span>
-                  <span>{language === 'KO' ? 'StockTemp 가치 평가 요약' : language === 'VI' ? 'Tóm tắt định giá StockTemp' : 'StockTemp Valuation Summary'}</span>
-                </h3>
-              </div>
-
-              {/* Grid layout for left text summary and right vertical gauge */}
-              <div className="grid grid-cols-12 gap-4 items-stretch">
-                {/* Left side (8/12 column): Temp Banner and Action Guide with reduced width */}
-                <div className="col-span-8 flex flex-col justify-between gap-4">
-                  {/* Stock Temperature Banner with WeatherIcon only */}
-                  <div className="flex items-center gap-4 bg-gradient-to-r from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-4 flex-1 shadow-md">
-                    <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl shadow-inner shrink-0">
-                      <WeatherIcon name={tempDetails.iconName} className="w-8 h-8" />
-                    </div>
-                    <div className="space-y-1 min-w-0">
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
-                        {t('currentStockTemp')}
-                      </span>
-                      <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-0.5">
-                        <span className={`text-lg font-black font-mono leading-none ${tempDetails.colorClass}`}>
-                          {tempDetails.tempVal}
+                  {!isAwaitingSync && (
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {isDeficit && (
+                        <span className="text-[9px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/25">
+                          {language === 'KO' ? '순익적자 (BPS)' : 'BPS Basis'}
                         </span>
-                        <span className={`text-[10px] font-bold ${tempDetails.colorClass}`}>
-                          {tempDetails.emoji} {tempDetails.label}
+                      )}
+                      {fairPrice > 0 && (
+                        <span className={`text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm ${
+                          isUndervalued 
+                            ? 'bg-blue-500/20 border-blue-400/40 text-blue-300' 
+                            : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
+                        }`}>
+                          {language === 'KO'
+                            ? `적정가와 ${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% 차이 (${isUndervalued ? '저평가' : '고평가'})`
+                            : language === 'VI'
+                            ? `Chênh lệch ${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% (${isUndervalued ? 'Định giá thấp' : 'Định giá cao'})`
+                            : `${isUndervalued ? '+' : ''}${priceGapPct.toFixed(1)}% vs Fair Value (${isUndervalued ? 'Undervalued' : 'Overvalued'})`}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Vector Flow Body: [ 현재가 ] ──▶ [ 방향 & 괴리율 ] ──▶ [ AI 적정가 ] */}
+                <div className="mt-4 pt-1">
+                  {isAwaitingSync || fairPrice <= 0 ? (
+                    <div className="flex items-center justify-between py-3 sm:py-4 px-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                      <div className="text-left flex-1 min-w-0 overflow-hidden">
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">{language === 'KO' ? '현재가' : 'Current'}</span>
+                        <span className="text-xs min-[360px]:text-sm sm:text-lg lg:text-2xl font-black font-mono text-slate-100 truncate block">
+                          {isAwaitingSync ? '--' : `${stock.currency} ${currentPrice.toLocaleString()}`}
                         </span>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Action Recommendation Message */}
-                  <div className="bg-gradient-to-br from-slate-950/80 via-indigo-950/20 to-slate-950/80 border border-indigo-500/20 shadow-inner p-4 rounded-xl text-xs text-slate-300 leading-relaxed">
-                    <span className="font-bold text-indigo-400 block mb-1 text-[10px] uppercase tracking-wider">
-                      {language === 'KO' ? '행동 가이드' : language === 'VI' ? 'Hướng dẫn hành động' : 'Action Guide'}
-                    </span>
-                    {tempDetails.description}
-                  </div>
-                </div>
-
-                {/* Right side (4/12 column): Vertical Temperature Gauge */}
-                <div className="col-span-4 bg-gradient-to-b from-slate-950/80 via-slate-900/40 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-1.5 flex flex-col items-center justify-center min-h-[185px] shadow-md">
-                  {isAwaitingSync ? (
-                    <div className="flex flex-col items-center justify-center space-y-2 py-4">
-                      <div className="w-6 h-6 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-                      <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Syncing</span>
+                      <div className="text-slate-500 font-bold text-sm px-2 shrink-0">➔</div>
+                      <div className="text-right flex-1 min-w-0 overflow-hidden">
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">{language === 'KO' ? 'AI 적정가' : 'Fair Value'}</span>
+                        <span className="text-xs min-[360px]:text-sm sm:text-base lg:text-xl font-bold font-mono text-slate-400 truncate block">N/A</span>
+                      </div>
                     </div>
                   ) : (
-                    renderVerticalTempGauge(stockTemp)
+                    <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
+                      {/* Left Box: 현재 시장가 */}
+                      <div className="flex-1 min-w-0 text-left overflow-hidden">
+                        <div className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 inline-block" />
+                          <span className="truncate">{language === 'KO' ? '현재 주가' : 'Current Price'}</span>
+                        </div>
+                        <div 
+                          className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-slate-100 tracking-tight mt-0.5 truncate flex items-baseline gap-0.5 sm:gap-1"
+                          title={`${stock.currency} ${currentPrice.toLocaleString()}`}
+                        >
+                          <span className="text-[10px] sm:text-xs font-semibold text-slate-400 shrink-0">{stock.currency}</span>
+                          <span className="truncate">{currentPrice.toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {/* Center Vector Indicator with Trending Icon & Hover Zoom */}
+                      <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
+                        <div className={`group flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-105 hover:shadow-xl ${
+                          isUndervalued 
+                            ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25' 
+                            : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
+                        }`}>
+                          {isUndervalued ? (
+                            <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                          ) : (
+                            <TrendingDown className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                          )}
+                          <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight whitespace-nowrap">
+                            {isUndervalued ? `+${priceGapPct.toFixed(1)}%` : `${priceGapPct.toFixed(1)}%`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right Box: AI 산정 적정가 */}
+                      <div className="flex-1 min-w-0 text-right overflow-hidden">
+                        <div className="text-[10px] sm:text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center justify-end gap-1">
+                          <span className="truncate">{language === 'KO' ? 'AI 적정가' : language === 'VI' ? 'Giá hợp lý (AI)' : 'AI Fair Value'}</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0 inline-block" />
+                        </div>
+                        <div 
+                          className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-indigo-300 tracking-tight mt-0.5 truncate flex items-baseline justify-end gap-0.5 sm:gap-1"
+                          title={`${stock.currency} ${Math.round(fairPrice).toLocaleString()}`}
+                        >
+                          <span className="text-[10px] sm:text-xs font-semibold text-indigo-400 shrink-0">{stock.currency}</span>
+                          <span className="truncate">{Math.round(fairPrice).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
+            )
+          })()}
+
+          {/* Master Card 2: 금리 대비 수익률 (스마트 벡터 플로우) */}
+          <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-4 sm:p-5 md:p-6 shadow-xl flex flex-col justify-between">
+            {/* Header: Title & Spread Badge */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-300 font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+                <span>⚡</span>
+                <span>{language === 'KO' ? '금리 대비 수익률' : language === 'VI' ? 'Lợi suất vs Lãi suất' : 'Yield vs Interest Rate'}</span>
+              </span>
+              {!isAwaitingSync && (
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span className={`text-[10px] sm:text-[11px] font-black px-2 sm:px-2.5 py-0.5 rounded-full border shadow-sm ${
+                    isPositiveSpread 
+                      ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300' 
+                      : 'bg-rose-500/20 border-rose-400/40 text-rose-300'
+                  }`}>
+                    {language === 'KO'
+                      ? `${isPositiveSpread ? '+' : ''}${yieldSpread}%p ${isPositiveSpread ? '여유' : '부족'}`
+                      : language === 'VI'
+                      ? `${isPositiveSpread ? '+' : ''}${yieldSpread}%p ${isPositiveSpread ? 'Dư địa' : 'Thiếu hụt'}`
+                      : `${isPositiveSpread ? '+' : ''}${yieldSpread}%p Spread`}
+                  </span>
+                </div>
+              )}
             </div>
 
-            {/* Core Metrics Unified Box (Option 2) */}
-            <div className="mt-4 bg-gradient-to-br from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-blue-500/20 rounded-2xl p-4 shadow-lg">
-              <div className="grid grid-cols-3 text-center divide-x divide-slate-800/40">
-                {/* 1. Target P/E Multiple (AI Target) */}
-                <div className="space-y-1 min-w-0">
-                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
-                    {language === 'KO' ? '적정 P/E (AI산정)' : language === 'VI' ? 'P/E hợp lý (AI chọn)' : 'Fair P/E (AI Calc)'}
-                  </span>
-                  <span className="block font-black text-blue-400 font-mono text-sm sm:text-base mt-0.5">
-                    {targetPe}x
-                  </span>
+            {/* Vector Flow Body: [ 기준금리 ] ──▶ [ 스프레드 ] ──▶ [ 기업 기대수익률 ] */}
+            <div className="mt-4 pt-1">
+              <div className="relative flex items-center justify-between gap-1.5 sm:gap-3 bg-slate-950/60 border border-slate-800/80 rounded-2xl p-2.5 sm:p-4">
+                {/* Left Box: 기준금리 */}
+                <div className="flex-1 min-w-0 text-left overflow-hidden">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 inline-block" />
+                    <span className="truncate">{language === 'KO' ? `기준금리(${stock.country})` : 'Base Rate'}</span>
+                  </div>
+                  <div className="text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono text-amber-400 tracking-tight mt-0.5 truncate">
+                    {baseRate}
+                  </div>
                 </div>
 
-                {/* 2. Current P/E Ratio */}
-                <div className="space-y-1 min-w-0">
-                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
-                    {language === 'KO' ? '현재 P/E' : language === 'VI' ? 'P/E hiện tại' : 'Current P/E'}
-                  </span>
-                  <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
-                    {isAwaitingSync ? '--' : `${(currentPrice / currentEps).toFixed(1)}x`}
-                  </span>
+                {/* Center Vector Indicator with Spread */}
+                <div className="shrink-0 flex flex-col items-center px-0.5 sm:px-1">
+                  <div className={`group flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl sm:rounded-2xl border shadow-lg font-black font-mono transition-all duration-300 cursor-pointer hover:scale-105 hover:shadow-xl ${
+                    isPositiveSpread
+                      ? 'bg-gradient-to-r from-emerald-950/90 via-teal-950/90 to-cyan-950/90 border-emerald-500/50 text-emerald-300 shadow-emerald-500/25'
+                      : 'bg-gradient-to-r from-rose-950/90 via-red-950/90 to-amber-950/90 border-rose-500/50 text-rose-300 shadow-rose-500/25'
+                  }`}>
+                    {isPositiveSpread ? (
+                      <TrendingUp className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                    ) : (
+                      <TrendingDown className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-rose-400 shrink-0 stroke-[2.8] transition-transform duration-300 group-hover:scale-125" />
+                    )}
+                    <span className="text-xs sm:text-sm md:text-base font-extrabold tracking-tight whitespace-nowrap">
+                      {isAwaitingSync ? '--' : `${isPositiveSpread ? '+' : ''}${yieldSpread}%p`}
+                    </span>
+                  </div>
                 </div>
 
-                {/* 3. Earnings Per Share (EPS) */}
-                <div className="space-y-1 min-w-0">
-                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
-                    {language === 'KO' ? '현재 EPS' : language === 'VI' ? 'EPS hiện tại' : 'Current EPS'}
-                  </span>
-                  <span className="block font-black text-slate-200 font-mono text-xs sm:text-sm mt-0.5 truncate px-1">
-                    {stock.currency} {Math.round(currentEps).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Horizontal Divider */}
-              <div className="my-3.5 border-t border-slate-800/40"></div>
-
-              <div className="grid grid-cols-3 text-center divide-x divide-slate-800/40">
-                {/* 4. Return on Equity (ROE) */}
-                <div className="space-y-1 min-w-0">
-                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
-                    {t('roe')}
-                  </span>
-                  <span className="block font-black text-emerald-400 font-mono text-sm sm:text-base mt-0.5">
-                    {stock.roe !== undefined && stock.roe !== null ? `${stock.roe.toFixed(1)}%` : '-'}
-                  </span>
-                </div>
-
-                {/* 5. Price to Book Ratio (PBR) */}
-                <div className="space-y-1 min-w-0">
-                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
-                    {t('pbr')}
-                  </span>
-                  <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
-                    {stock.pbr !== undefined && stock.pbr !== null ? `${stock.pbr.toFixed(2)}x` : '-'}
-                  </span>
-                </div>
-
-                {/* 6. Debt to Equity Ratio (부채비율) */}
-                <div className="space-y-1 min-w-0">
-                  <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
-                    {t('debtRatio')}
-                  </span>
-                  <span className="block font-black text-rose-400 font-mono text-sm sm:text-base mt-0.5">
-                    {stock.debtRatio !== undefined && stock.debtRatio !== null ? `${stock.debtRatio.toFixed(1)}%` : '-'}
-                  </span>
+                {/* Right Box: 기업 기대수익률 */}
+                <div className="flex-1 min-w-0 text-right overflow-hidden">
+                  <div className="text-[10px] sm:text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center justify-end gap-1">
+                    <span className="truncate">{language === 'KO' ? '기업 기대수익률' : 'Earnings Yield'}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 inline-block" />
+                  </div>
+                  <div className={`text-xs min-[360px]:text-sm sm:text-lg md:text-xl lg:text-2xl font-black font-mono tracking-tight mt-0.5 truncate ${
+                    isPositiveSpread ? 'text-emerald-400' : 'text-slate-100'
+                  }`}>
+                    {isAwaitingSync ? '--' : `${expectedReturn}%`}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Right Column: Custom Financial Charts Dashboard (Lg: 8/12) */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          {/* Consensus vs Fair Value Comparison Section (Desktop: Top / Mobile: Below EPS & BPS) */}
-          <div className="order-2 lg:order-1">
-            {isAwaitingSync ? (
-              <div className="flex flex-col items-center justify-center h-48 border border-dashed border-slate-800 bg-slate-950/10 rounded-3xl p-6 text-center space-y-2">
-                <span className="text-2xl">📊</span>
-                <p className="text-xs text-slate-400 font-bold">
-                  {language === 'KO' ? '비교 차트 생성 대기 중' : language === 'VI' ? 'Đang tạo biểu đồ so sánh' : 'Comparison Chart Pending'}
-                </p>
-                <p className="text-[10px] text-slate-500 leading-relaxed max-w-xs">
-                  {language === 'KO' ? '주가와 재무 데이터 동기화가 완료되면 가치산정 비교 차트가 시각화됩니다.' : 'The comparison chart will visualize fair price relative to current market price once synced.'}
-                </p>
+      {/* Middle Layout: Regular Stock Charts vs Dedicated ETF Holdings & Factsheet Dashboard (No Charts for ETF) */}
+      {etfDetails ? (
+        /* Dedicated ETF Middle Dashboard: Left (4/12 Summary) & Right (8/12 Top Holdings & Factsheet, NO CHARTS) */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          {/* Left Column: ETF Temperature & Essential Product Highlights (Lg: 4/12) */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 shadow-2xl flex flex-col justify-between h-full">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    <span>{language === 'KO' ? 'StockTemp ETF 가치 요약' : 'StockTemp ETF Valuation'}</span>
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-12 gap-4 items-stretch">
+                  <div className="col-span-8 flex flex-col justify-between gap-4">
+                    {/* Stock Temperature Banner with WeatherIcon */}
+                    <div className="flex items-center gap-4 bg-gradient-to-r from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-4 flex-1 shadow-md">
+                      <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl shadow-inner shrink-0">
+                        <WeatherIcon name={tempDetails.iconName} className="w-8 h-8" />
+                      </div>
+                      <div className="space-y-1 min-w-0">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
+                          {t('currentStockTemp')}
+                        </span>
+                        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-0.5">
+                          <span className={`text-lg font-black font-mono leading-none ${tempDetails.colorClass}`}>
+                            {tempDetails.tempVal}
+                          </span>
+                          <span className={`text-[10px] font-bold ${tempDetails.colorClass}`}>
+                            {tempDetails.emoji} {tempDetails.label}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Temperature Analysis for ETF */}
+                    <div className="bg-gradient-to-br from-slate-950/80 via-indigo-950/20 to-slate-950/80 border border-indigo-500/20 shadow-inner p-4 rounded-xl text-xs font-semibold text-slate-200 leading-snug">
+                      <span className="font-bold text-indigo-400 block mb-1 text-[10px] uppercase tracking-wider">
+                        {language === 'KO' ? '온도 지표 분석' : 'Temperature Analysis'}
+                      </span>
+                      {language === 'KO'
+                        ? `12개월 목표 상승 여력 +${etfDetails.targetUpsidePct}% · 적정 가치 구간`
+                        : `12M Target Upside +${etfDetails.targetUpsidePct}% · Fair Value Zone`}
+                    </div>
+                  </div>
+
+                  {/* Vertical Temperature Gauge */}
+                  <div className="col-span-4 bg-gradient-to-b from-slate-950/80 via-slate-900/40 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-1.5 flex flex-col items-center justify-center min-h-[185px] shadow-md">
+                    {renderVerticalTempGauge(stockTemp)}
+                  </div>
+                </div>
               </div>
-            ) : isDeficit || fairPrice <= 0 ? (
-              <div className="flex flex-col items-center justify-center h-44 bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-slate-800/80 rounded-2xl p-6 text-center space-y-2 shadow-xl">
-                <p className="text-sm text-slate-200 font-extrabold">
-                  {language === 'KO' ? '적정가 산정불가 (적자기업)' : language === 'VI' ? 'Không thể tính giá hợp lý (Doanh nghiệp thua lỗ)' : 'Fair Price Not Applicable (Deficit Company)'}
-                </p>
-                <p className="text-[11px] text-slate-400 leading-relaxed max-w-sm">
-                  {language === 'KO' 
-                    ? '당기순손실(EPS 음수) 기업은 P/E 기반의 적정주가가 산정되지 않습니다. BPS 추이를 참고해 주세요.' 
-                    : 'P/E-based fair price is not applicable for companies with negative earnings. Please refer to BPS trend.'}
-                </p>
+
+              {/* ETF Core Factsheet Box (Base Index & Currency Exposure) */}
+              <div className="mt-4 bg-gradient-to-br from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-blue-500/20 rounded-2xl p-4 shadow-lg space-y-3">
+                <div className="space-y-1 text-left">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight block">
+                    {language === 'KO' ? '기초 지수' : 'Base Index'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-blue-300 block">
+                    {etfDetails.baseIndex}
+                  </span>
+                </div>
+
+                <div className="border-t border-slate-800/60"></div>
+
+                <div className="space-y-1 text-left">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight block">
+                    {language === 'KO' ? '환노출 형태' : 'Currency Exposure'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-indigo-300 block">
+                    {etfDetails.currencyType}
+                  </span>
+                </div>
               </div>
-            ) : (
-              <ConsensusCompareChart stock={stock} currentPrice={currentPrice} fairPrice={fairPrice} language={language} t={t} />
-            )}
+            </div>
           </div>
 
-          {/* Quarterly EPS & BPS Financial Trend Charts (Mobile: Top / Desktop: Below Consensus Chart) */}
-          <div className="order-1 lg:order-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <CustomRevenueEpsChart stock={stock} currentEps={currentEps} language={language} t={t} />
-            <CustomBpsChart stock={stock} currentPrice={currentPrice} t={t} />
-          </div>
+          {/* Right Column: Top Holdings & Factsheet Cards (Lg: 8/12, NO CHARTS) */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            {/* Card 1: 🏆 주요 편입 상위 종목 (Top Holdings) */}
+            <div className="bg-slate-900 border border-slate-800/90 rounded-3xl p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-100 flex items-center gap-2">
+                      <span>{language === 'KO' ? '주요 편입 상위 종목 (Top Holdings)' : 'Top Portfolio Holdings'}</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      {language === 'KO' ? '이 ETF가 바구니에 가장 많이 담고 있는 핵심 우량 자산 비중입니다.' : 'Leading weight distribution in this ETF portfolio.'}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                  {etfDetails.holdings.length} Assets
+                </span>
+              </div>
 
-          {/* Regulatory In-line Disclaimer (Vietnamese Securities Law & Global Compliance) */}
-          <div className="order-3 lg:order-3 flex items-start gap-2.5 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs sm:text-[13px] font-medium text-slate-300 leading-relaxed select-none shadow-sm">
-            <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-            <p>
-              {language === 'KO'
-                ? '💡 본 지표는 투자 권유가 아닌 참고용 가상 분석 자료이며, 모든 투자 책임은 본인에게 귀속됩니다.'
-                : language === 'VI'
-                ? '💡 Dữ liệu chỉ mang tính chất tham khảo học thuật, không cấu thành lời khuyên đầu tư hay mua bán chứng khoán.'
-                : '💡 For informational and simulation purposes only. Does not constitute investment advice or trading solicitations.'}
-            </p>
+              {/* Holdings Progress Bar Breakdown */}
+              <div className="space-y-3 pt-2">
+                <div className="w-full h-3 rounded-full bg-slate-950 flex overflow-hidden p-0.5 border border-slate-800">
+                  {etfDetails.holdings.map((h, i) => {
+                    const colors = [
+                      'bg-blue-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-indigo-500', 
+                      'bg-purple-500', 'bg-amber-500', 'bg-rose-500', 'bg-teal-500'
+                    ]
+                    return (
+                      <div 
+                        key={h.ticker} 
+                        style={{ width: `${h.weight * 2}%` }} 
+                        className={`${colors[i % colors.length]} h-full first:rounded-l-full last:rounded-r-full transition-all`}
+                        title={`${h.name} (${h.weight}%)`}
+                      />
+                    )
+                  })}
+                </div>
+
+                {/* Holdings Grid List */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {etfDetails.holdings.map((h, idx) => {
+                    const colors = [
+                      'text-blue-400 bg-blue-500/10 border-blue-500/20',
+                      'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+                      'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+                      'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
+                      'text-purple-400 bg-purple-500/10 border-purple-500/20',
+                      'text-amber-400 bg-amber-500/10 border-amber-500/20',
+                      'text-rose-400 bg-rose-500/10 border-rose-500/20',
+                      'text-teal-400 bg-teal-500/10 border-teal-500/20'
+                    ]
+                    return (
+                      <div 
+                        key={h.ticker} 
+                        className="flex items-center justify-between p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={`w-6 h-6 rounded-lg font-mono text-[11px] font-black flex items-center justify-center shrink-0 border ${colors[idx % colors.length]}`}>
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-slate-200 block truncate">
+                              {h.name}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono block">
+                              {h.ticker} · {h.sector}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0 pl-2">
+                          <span className="text-xs font-black font-mono text-slate-100">
+                            {h.weight.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: 🛡️ ETF 핵심 투자 체크포인트 (1x2 Horizontal Grid) */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 space-y-1.5 shadow-md">
+                <div className="flex items-center gap-1.5 text-blue-400 text-xs font-bold">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{language === 'KO' ? '분배금(배당) 주기' : 'Dividend Payout'}</span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-200 font-bold">
+                  {etfDetails.dividendFrequency}
+                </p>
+                <span className="text-[10px] text-slate-500 block leading-tight">
+                  {language === 'KO' ? '계좌로 자동 입금되는 현금 분배금' : 'Auto-credited to cash balance'}
+                </span>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 space-y-1.5 shadow-md">
+                <div className="flex items-center gap-1.5 text-purple-400 text-xs font-bold">
+                  <Building2 className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{language === 'KO' ? '연금저축 / ISA 절세' : 'Tax Advantage'}</span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-200 font-bold">
+                  {stock.country === 'KR' ? '절세 계좌(ISA/연금) 가능' : 'Standard 15.4% / 22%'}
+                </p>
+                <span className="text-[10px] text-slate-500 block leading-tight">
+                  {language === 'KO' ? '과세이연 및 비과세 혜택 극대화' : 'Tax-deferred growth'}
+                </span>
+              </div>
+            </div>
+
+            {/* In-line Disclaimer (Option 1 without emoji icon) */}
+            <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs font-medium text-slate-400 text-center sm:text-left leading-relaxed shadow-sm">
+              <p>
+                {language === 'KO'
+                  ? '본 지표는 단순 참고용이며, 모든 투자 판단과 손실에 대한 최종 책임은 투자자 본인에게 있습니다.'
+                  : 'For reference only. All investment decisions and risks rest solely with the investor.'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* Regular Stock Middle Layout: Interactive Valuation Slider & SVG Charts Dashboard */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          {/* Left Column: AI Valuation & Stock Temperature Summary Card (Lg: 4/12) */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 shadow-2xl flex flex-col justify-between h-full">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-2">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                    </span>
+                    <span>{language === 'KO' ? 'StockTemp 가치 평가 요약' : language === 'VI' ? 'Tóm tắt định giá StockTemp' : 'StockTemp Valuation Summary'}</span>
+                  </h3>
+                </div>
+
+                {/* Grid layout for left text summary and right vertical gauge */}
+                <div className="grid grid-cols-12 gap-4 items-stretch">
+                  {/* Left side (8/12 column): Temp Banner and Action Guide with reduced width */}
+                  <div className="col-span-8 flex flex-col justify-between gap-4">
+                    {/* Stock Temperature Banner with WeatherIcon only */}
+                    <div className="flex items-center gap-4 bg-gradient-to-r from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-4 flex-1 shadow-md">
+                      <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl shadow-inner shrink-0">
+                        <WeatherIcon name={tempDetails.iconName} className="w-8 h-8" />
+                      </div>
+                      <div className="space-y-1 min-w-0">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
+                          {t('currentStockTemp')}
+                        </span>
+                        <div className="flex items-baseline flex-wrap gap-x-2 gap-y-1 mt-0.5">
+                          <span className={`text-lg font-black font-mono leading-none ${tempDetails.colorClass}`}>
+                            {tempDetails.tempVal}
+                          </span>
+                          <span className={`text-[10px] font-bold ${tempDetails.colorClass}`}>
+                            {tempDetails.emoji} {tempDetails.label}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Temperature State Analysis Message */}
+                    <div className="bg-gradient-to-br from-slate-950/80 via-indigo-950/20 to-slate-950/80 border border-indigo-500/20 shadow-inner p-4 rounded-xl text-xs text-slate-300 leading-relaxed">
+                      <span className="font-bold text-indigo-400 block mb-1 text-[10px] uppercase tracking-wider">
+                        {language === 'KO' ? '온도 지표 분석' : language === 'VI' ? 'Phân tích nhiệt độ' : 'Temperature Analysis'}
+                      </span>
+                      {tempDetails.description}
+                    </div>
+                  </div>
+
+                  {/* Right side (4/12 column): Vertical Temperature Gauge */}
+                  <div className="col-span-4 bg-gradient-to-b from-slate-950/80 via-slate-900/40 to-slate-950/80 border border-indigo-500/20 rounded-2xl p-1.5 flex flex-col items-center justify-center min-h-[185px] shadow-md">
+                    {isAwaitingSync ? (
+                      <div className="flex flex-col items-center justify-center space-y-2 py-4">
+                        <div className="w-6 h-6 border-2 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+                        <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Syncing</span>
+                      </div>
+                    ) : (
+                      renderVerticalTempGauge(stockTemp)
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Core Metrics Unified Box (Option 2) */}
+              <div className="mt-4 bg-gradient-to-br from-slate-950/80 via-slate-900/50 to-slate-950/80 border border-blue-500/20 rounded-2xl p-4 shadow-lg">
+                <div className="grid grid-cols-3 text-center divide-x divide-slate-800/40">
+                  {/* 1. Target P/E Multiple (AI Target) */}
+                  <div className="space-y-1 min-w-0">
+                    <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                      {language === 'KO' ? '적정 P/E (AI산정)' : language === 'VI' ? 'P/E hợp lý (AI chọn)' : 'Fair P/E (AI Calc)'}
+                    </span>
+                    <span className="block font-black text-blue-400 font-mono text-sm sm:text-base mt-0.5">
+                      {targetPe}x
+                    </span>
+                  </div>
+
+                  {/* 2. Current P/E Ratio */}
+                  <div className="space-y-1 min-w-0">
+                    <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                      {language === 'KO' ? '현재 P/E' : language === 'VI' ? 'P/E hiện tại' : 'Current P/E'}
+                    </span>
+                    <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
+                      {isAwaitingSync ? '--' : `${(currentPrice / currentEps).toFixed(1)}x`}
+                    </span>
+                  </div>
+
+                  {/* 3. Earnings Per Share (EPS) */}
+                  <div className="space-y-1 min-w-0">
+                    <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                      {language === 'KO' ? '현재 EPS' : language === 'VI' ? 'EPS hiện tại' : 'Current EPS'}
+                    </span>
+                    <span className="block font-black text-slate-200 font-mono text-xs sm:text-sm mt-0.5 truncate px-1">
+                      {stock.currency} {Math.round(currentEps).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Horizontal Divider */}
+                <div className="my-3.5 border-t border-slate-800/40"></div>
+
+                <div className="grid grid-cols-3 text-center divide-x divide-slate-800/40">
+                  {/* 4. Return on Equity (ROE) */}
+                  <div className="space-y-1 min-w-0">
+                    <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                      {t('roe')}
+                    </span>
+                    <span className="block font-black text-emerald-400 font-mono text-sm sm:text-base mt-0.5">
+                      {stock.roe !== undefined && stock.roe !== null ? `${stock.roe.toFixed(1)}%` : '-'}
+                    </span>
+                  </div>
+
+                  {/* 5. Price to Book Ratio (PBR) */}
+                  <div className="space-y-1 min-w-0">
+                    <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                      {t('pbr')}
+                    </span>
+                    <span className="block font-black text-slate-200 font-mono text-sm sm:text-base mt-0.5">
+                      {stock.pbr !== undefined && stock.pbr !== null ? `${stock.pbr.toFixed(2)}x` : '-'}
+                    </span>
+                  </div>
+
+                  {/* 6. Debt to Equity Ratio (부채비율) */}
+                  <div className="space-y-1 min-w-0">
+                    <span className="block text-slate-550 text-[10px] sm:text-[11px] font-bold uppercase tracking-tighter leading-tight whitespace-nowrap">
+                      {t('debtRatio')}
+                    </span>
+                    <span className="block font-black text-rose-400 font-mono text-sm sm:text-base mt-0.5">
+                      {stock.debtRatio !== undefined && stock.debtRatio !== null ? `${stock.debtRatio.toFixed(1)}%` : '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Custom Financial Charts Dashboard (Lg: 8/12) */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
+            {/* Consensus vs Fair Value Comparison Section (Desktop: Top / Mobile: Below EPS & BPS) */}
+            <div className="order-2 lg:order-1">
+              {isAwaitingSync ? (
+                <div className="flex flex-col items-center justify-center h-48 border border-dashed border-slate-800 bg-slate-950/10 rounded-3xl p-6 text-center space-y-2">
+                  <span className="text-2xl">📊</span>
+                  <p className="text-xs text-slate-400 font-bold">
+                    {language === 'KO' ? '비교 차트 생성 대기 중' : language === 'VI' ? 'Đang tạo biểu đồ so sánh' : 'Comparison Chart Pending'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 leading-relaxed max-w-xs">
+                    {language === 'KO' ? '주가와 재무 데이터 동기화가 완료되면 가치산정 비교 차트가 시각화됩니다.' : 'The comparison chart will visualize fair price relative to current market price once synced.'}
+                  </p>
+                </div>
+              ) : isDeficit || fairPrice <= 0 ? (
+                <div className="flex flex-col items-center justify-center h-44 bg-gradient-to-b from-slate-900/80 via-slate-950/90 to-slate-950/90 border border-slate-800/80 rounded-2xl p-6 text-center space-y-2 shadow-xl">
+                  <p className="text-sm text-slate-200 font-extrabold">
+                    {language === 'KO' ? '적정가 산정불가 (적자기업)' : language === 'VI' ? 'Không thể tính giá hợp lý (Doanh nghiệp thua lỗ)' : 'Fair Price Not Applicable (Deficit Company)'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed max-w-sm">
+                    {language === 'KO' 
+                      ? '당기순손실(EPS 음수) 기업은 P/E 기반의 적정주가가 산정되지 않습니다. BPS 추이를 참고해 주세요.' 
+                      : 'P/E-based fair price is not applicable for companies with negative earnings. Please refer to BPS trend.'}
+                  </p>
+                </div>
+              ) : (
+                <ConsensusCompareChart stock={stock} currentPrice={currentPrice} fairPrice={fairPrice} language={language} t={t} />
+              )}
+            </div>
+
+            {/* Quarterly EPS & BPS Financial Trend Charts (Mobile: Top / Desktop: Below Consensus Chart) */}
+            <div className="order-1 lg:order-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CustomRevenueEpsChart stock={stock} currentEps={currentEps} language={language} t={t} />
+              <CustomBpsChart stock={stock} currentPrice={currentPrice} t={t} />
+            </div>
+
+            {/* Regulatory In-line Disclaimer (Vietnamese Securities Law & Global Compliance) */}
+            <div className="order-3 lg:order-3 flex items-start gap-2.5 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/90 text-xs sm:text-[13px] font-medium text-slate-300 leading-relaxed select-none shadow-sm">
+              <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+              <p>
+                {language === 'KO'
+                  ? '💡 본 지표는 투자 권유가 아닌 참고용 가상 분석 자료이며, 모든 투자 책임은 본인에게 귀속됩니다.'
+                  : language === 'VI'
+                  ? '💡 Dữ liệu chỉ mang tính chất tham khảo học thuật, không cấu thành lời khuyên đầu tư hay mua bán chứng khoán.'
+                  : '💡 For informational and simulation purposes only. Does not constitute investment advice or trading solicitations.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom: Latest News Section (Max 3 articles) */}
       <div className="border-t border-slate-800/60 pt-8 space-y-4">
@@ -1143,7 +1477,7 @@ export default function StockDetail() {
                   onChange={(e) => setDiscussionContent(e.target.value.slice(0, 500))}
                   placeholder={
                     language === 'KO' 
-                      ? '이 종목의 실적 전망, 목표가, 매수/매도 이유 등 자유로운 투자 의견을 남겨보세요.' 
+                      ? '이 종목의 실적 전망, 목표가, 밸류에이션 등 자유로운 투자 의견을 남겨보세요.' 
                       : language === 'VI'
                       ? 'Chia sẻ nhận định, kỳ vọng giá hoặc phân tích của bạn về cổ phiếu này.'
                       : 'Share your analysis, target price, or thoughts on this stock...'

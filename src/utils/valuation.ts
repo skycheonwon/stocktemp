@@ -87,7 +87,7 @@ export function getTemperatureDetails(temp: number): TemperatureState {
       colorClass: 'text-blue-400',
       badgeColorClass: 'bg-blue-950/80 text-blue-300 border-blue-900/50',
       gradientClass: 'from-blue-500 to-cyan-500',
-      description: '내재가치 및 역사적 밴드 대비 크게 낮게 평가된 구간입니다.',
+      description: '상승 여력 최대 · 역사적 저평가 저점 구간입니다.',
       iconName: 'snowflake',
     }
   } else if (temp < 15) {
@@ -96,7 +96,7 @@ export function getTemperatureDetails(temp: number): TemperatureState {
       colorClass: 'text-cyan-400',
       badgeColorClass: 'bg-cyan-950/80 text-cyan-300 border-cyan-900/50',
       gradientClass: 'from-cyan-500 to-teal-500',
-      description: '수익 가치 대비 주가 배수가 낮게 형성되어 있는 상태입니다.',
+      description: '상승 여력 높음 · 주가 저평가 구간입니다.',
       iconName: 'wind',
     }
   } else if (temp < 35) {
@@ -105,7 +105,7 @@ export function getTemperatureDetails(temp: number): TemperatureState {
       colorClass: 'text-emerald-400',
       badgeColorClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-900/50',
       gradientClass: 'from-emerald-500 to-green-500',
-      description: '현재 주가가 기업의 내재 가치 지표에 부합하는 균형 구간입니다.',
+      description: '상승 여력 안정적 · 균형 가치 구간입니다.',
       iconName: 'cloud-sun',
     }
   } else if (temp < 50) {
@@ -114,16 +114,16 @@ export function getTemperatureDetails(temp: number): TemperatureState {
       colorClass: 'text-amber-400',
       badgeColorClass: 'bg-amber-950/80 text-amber-300 border-amber-900/50',
       gradientClass: 'from-amber-500 to-orange-500',
-      description: '기업 실적 대비 주가 배수가 높게 형성되어 단기 변동성이 커질 수 있습니다.',
+      description: '단기 급등 상태 · 1년 목표가 근접 구간입니다.',
       iconName: 'sun',
     }
   } else {
     return {
-      label: '극심한 고평가 (극단과열)',
+      label: '극심한 고평가 (폭염)',
       colorClass: 'text-rose-500',
       badgeColorClass: 'bg-rose-950/80 text-rose-300 border-rose-900/50',
       gradientClass: 'from-orange-500 to-rose-500',
-      description: '내재가치 대비 높은 프리미엄이 반영되어 있는 극단적 고평가 구간입니다.',
+      description: '1년 목표가 초과 · 단기 과열 주의 구간입니다.',
       iconName: 'flame',
     }
   }
