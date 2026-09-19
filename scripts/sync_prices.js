@@ -5,24 +5,31 @@ import path from 'path';
 
 function parseCredentials(input) {
   if (!input) return null;
-  let str = input.trim();
+  if (typeof input === 'object') return input;
+  let str = String(input).trim();
   if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
-    if (str.includes('project_id')) {
+    if (str.includes('project_id') || str.includes('private_key')) {
       str = str.slice(1, -1).trim();
     }
   }
 
-  function tryParseString(text) {
+  function tryParse(text) {
     if (!text || typeof text !== 'string') return null;
     try { return JSON.parse(text); } catch (e) {}
 
-    // Fix \U typo to \nU
+    // Replace literal escaped newlines or \U
     try {
       let fixed = text.replace(/\\U/g, '\\nU').replace(/\\\\U/g, '\\\\nU');
       return JSON.parse(fixed);
     } catch (e) {}
 
-    // Fix any invalid escape character in JSON
+    // Fix unescaped real newlines inside JSON string values
+    try {
+      let fixed = text.replace(/(?:\r\n|\r|\n)/g, '\\n');
+      return JSON.parse(fixed);
+    } catch (e) {}
+
+    // Fix invalid JSON escape characters
     try {
       let fixed = text.replace(/\\([^"\\/bfnrtu])/g, '\\\\$1');
       return JSON.parse(fixed);
@@ -31,26 +38,32 @@ function parseCredentials(input) {
     return null;
   }
 
-  // 1. Try directly on input
-  let parsed = tryParseString(str);
-  if (parsed) return parsed;
+  let result = tryParse(str);
+  if (result) return result;
 
-  // 2. Try base64 decoded
   try {
     const decoded = Buffer.from(str, 'base64').toString('utf8');
-    parsed = tryParseString(decoded);
-    if (parsed) return parsed;
+    result = tryParse(decoded);
+    if (result) return result;
   } catch (e) {}
 
   return null;
 }
 
-// 1. Initialize Firebase Admin (with auto-healing credentials)
+// 1. Initialize Firebase Admin (with multi-env support and auto-healing)
 let serviceAccount;
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  serviceAccount = parseCredentials(process.env.FIREBASE_SERVICE_ACCOUNT);
-  if (!serviceAccount) {
-    console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable (length: ' + process.env.FIREBASE_SERVICE_ACCOUNT.length + ')');
+const secretCandidates = [
+  process.env.FIREBASE_SERVICE_ACCOUNT,
+  process.env.FIREBASE_SERVICE_ACCOUNT_KEY,
+  process.env.FIREBASE_CREDENTIALS,
+  process.env.FIREBASE_KEY,
+  process.env.SERVICE_ACCOUNT
+];
+
+for (const rawSecret of secretCandidates) {
+  if (rawSecret && rawSecret.trim().length > 0) {
+    serviceAccount = parseCredentials(rawSecret);
+    if (serviceAccount) break;
   }
 }
 
@@ -67,7 +80,10 @@ if (!serviceAccount) {
 }
 
 if (!serviceAccount) {
-  console.error('Error: No Firebase credentials found. Please ensure FIREBASE_SERVICE_ACCOUNT secret is set.');
+  console.error('Error: No Firebase credentials found.');
+  console.error('Environment check:');
+  console.error('FIREBASE_SERVICE_ACCOUNT is', process.env.FIREBASE_SERVICE_ACCOUNT ? `SET (length ${process.env.FIREBASE_SERVICE_ACCOUNT.length})` : 'MISSING / EMPTY');
+  console.error('Please configure FIREBASE_SERVICE_ACCOUNT in GitHub Repository Secrets.');
   process.exit(1);
 }
 

@@ -25,5 +25,8 @@ jobs:
       - name: Run Price Sync Script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          FIREBASE_CREDENTIALS: ${{ secrets.FIREBASE_CREDENTIALS }}
+          FIREBASE_KEY: ${{ secrets.FIREBASE_KEY }}
         run: |
           node scripts/sync_prices.js
