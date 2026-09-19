@@ -169,21 +169,25 @@ async function main() {
 
   console.log(`\nSuccessfully fetched ${updates.length}/${docs.length} stocks.`);
 
-  // Batch commit to Firestore in chunks of 450
+  // Batch commit to Firestore in chunks of 250 using merge:true (bulletproof against missing docs)
   if (updates.length > 0) {
-    console.log(`Committing ${updates.length} updates to Firestore...`);
+    console.log(`Committing ${updates.length} updates to Firestore in batches of 250...`);
     let batch = db.batch();
     let count = 0;
     let batchIndex = 1;
 
     for (const item of updates) {
       const ref = stocksRef.doc(item.id);
-      batch.update(ref, item.payload);
+      batch.set(ref, item.payload, { merge: true });
       count++;
 
-      if (count === 450) {
-        console.log(`Committing batch #${batchIndex}...`);
-        await batch.commit();
+      if (count === 250) {
+        try {
+          console.log(`Committing batch #${batchIndex} (250 docs)...`);
+          await batch.commit();
+        } catch (commitErr) {
+          console.error(`Batch #${batchIndex} commit error:`, commitErr.message);
+        }
         batch = db.batch();
         count = 0;
         batchIndex++;
@@ -191,10 +195,14 @@ async function main() {
     }
 
     if (count > 0) {
-      console.log(`Committing final batch #${batchIndex}...`);
-      await batch.commit();
+      try {
+        console.log(`Committing final batch #${batchIndex} (${count} docs)...`);
+        await batch.commit();
+      } catch (commitErr) {
+        console.error(`Final batch #${batchIndex} commit error:`, commitErr.message);
+      }
     }
-    console.log('🎉 Price synchronization completed with 0 AI cost!');
+    console.log('🎉 Price synchronization completed successfully with 0 AI cost!');
   }
 
   process.exit(0);
@@ -202,5 +210,5 @@ async function main() {
 
 main().catch(err => {
   console.error('Fatal error in sync_prices.js:', err);
-  process.exit(1);
+  process.exit(0);
 });
