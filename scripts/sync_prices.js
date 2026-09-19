@@ -3,13 +3,54 @@ import { getFirestore } from 'firebase-admin/firestore';
 import fs from 'fs';
 import path from 'path';
 
-// 1. Initialize Firebase Admin
+function parseCredentials(input) {
+  if (!input) return null;
+  let str = input.trim();
+  if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+    if (str.includes('project_id')) {
+      str = str.slice(1, -1).trim();
+    }
+  }
+
+  function tryParseString(text) {
+    if (!text || typeof text !== 'string') return null;
+    try { return JSON.parse(text); } catch (e) {}
+
+    // Fix \U typo to \nU
+    try {
+      let fixed = text.replace(/\\U/g, '\\nU').replace(/\\\\U/g, '\\\\nU');
+      return JSON.parse(fixed);
+    } catch (e) {}
+
+    // Fix any invalid escape character in JSON
+    try {
+      let fixed = text.replace(/\\([^"\\/bfnrtu])/g, '\\\\$1');
+      return JSON.parse(fixed);
+    } catch (e) {}
+
+    return null;
+  }
+
+  // 1. Try directly on input
+  let parsed = tryParseString(str);
+  if (parsed) return parsed;
+
+  // 2. Try base64 decoded
+  try {
+    const decoded = Buffer.from(str, 'base64').toString('utf8');
+    parsed = tryParseString(decoded);
+    if (parsed) return parsed;
+  } catch (e) {}
+
+  return null;
+}
+
+// 1. Initialize Firebase Admin (with auto-healing credentials)
 let serviceAccount;
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  } catch (e) {
-    console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT env var:', e);
+  serviceAccount = parseCredentials(process.env.FIREBASE_SERVICE_ACCOUNT);
+  if (!serviceAccount) {
+    console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT environment variable (length: ' + process.env.FIREBASE_SERVICE_ACCOUNT.length + ')');
   }
 }
 
@@ -17,7 +58,8 @@ if (!serviceAccount) {
   const localKeyPath = path.join(process.cwd(), 'scripts', 'service-account.json');
   if (fs.existsSync(localKeyPath)) {
     try {
-      serviceAccount = JSON.parse(fs.readFileSync(localKeyPath, 'utf8'));
+      const fileContent = fs.readFileSync(localKeyPath, 'utf8');
+      serviceAccount = parseCredentials(fileContent);
     } catch (e) {
       console.error('Failed to read local service-account.json:', e);
     }
@@ -25,8 +67,18 @@ if (!serviceAccount) {
 }
 
 if (!serviceAccount) {
-  console.error('Error: No Firebase credentials found.');
+  console.error('Error: No Firebase credentials found. Please ensure FIREBASE_SERVICE_ACCOUNT secret is set.');
   process.exit(1);
+}
+
+// Ensure private_key formatting is standard PEM format
+if (serviceAccount.private_key) {
+  if (serviceAccount.private_key.includes('\\n')) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+  }
+  if (serviceAccount.private_key.includes('\\U')) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\U/g, '\nU');
+  }
 }
 
 initializeApp({
