@@ -193,7 +193,7 @@ export default function StockDiscoverDeck({
           return { stock: s, temp }
         })
         return evaluated
-          .filter(item => item.temp >= 30)
+          .filter(item => item.temp >= 27)
           .sort((a, b) => b.temp - a.temp)
           .map(item => item.stock)
       }
@@ -304,7 +304,7 @@ export default function StockDiscoverDeck({
           const liveEps = eps[s.ticker] ?? s.eps
           const fairPrice = calculateFairPrice(liveEps, s.defaultTargetPe || 15, s.bps, s.pbr, livePrice)
           const temp = calculateStockTemperature(livePrice, fairPrice)
-          return temp >= 30
+          return temp >= 27
         }).length
       case 'random':
       default:
@@ -618,11 +618,11 @@ export default function StockDiscoverDeck({
 
   // Helper to get sophisticated subtle gradient border matching temperature with crisp bottom distinction
   const getCardBorderGradient = (temp: number) => {
-    if (temp >= 50) return 'from-rose-500/60 via-rose-900/30 to-rose-500/45'
-    if (temp >= 35) return 'from-amber-500/55 via-amber-900/30 to-amber-500/40'
-    if (temp <= 0) return 'from-cyan-400/60 via-blue-900/30 to-cyan-400/45'
-    if (temp < 20) return 'from-teal-400/55 via-emerald-900/30 to-teal-400/40'
-    return 'from-slate-500/55 via-slate-750/30 to-slate-600/50'
+    if (temp >= 33) return 'from-rose-500/60 via-rose-900/30 to-rose-500/45'
+    if (temp >= 27) return 'from-amber-500/55 via-amber-900/30 to-amber-500/40'
+    if (temp < 0) return 'from-cyan-400/60 via-blue-900/30 to-cyan-400/45'
+    if (temp < 17) return 'from-teal-400/55 via-emerald-900/30 to-teal-400/40'
+    return 'from-emerald-500/55 via-slate-750/30 to-emerald-600/50'
   }
 
   const currentStock = deckStocks[currentIndex]

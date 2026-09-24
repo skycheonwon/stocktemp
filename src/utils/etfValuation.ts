@@ -19,16 +19,44 @@ export const getEtfDetails = (stock: any, currentPrice: number, language: string
   const nameLower = (stock.name || '').toLowerCase()
   const korLower = (stock.koreanName || '').toLowerCase()
   const tickerLower = (stock.ticker || '').toLowerCase()
-  const idLower = (stock.id || '').toLowerCase()
+
   
-  const isEtfFlag = stock.isEtf || stock.industry === 'ETF' || stock.industry === 'etf' ||
-    ['kodex', 'tiger', 'ace', 'sol', 'plus', 'rise', 'kbstar', 'woori', 'hanaro', 'timefolio',
-     'qqq', 'tqqq', 'sqqq', 'spy', 'voo', 'ivv', 'schd', 'soxx', 'smh', 'jepi', 'jepq', 'vti',
-     'xlk', 'tlt', 'gld', 'vnm', 'fuevfvnd', 'e1vfvn30', 'fuessvfl', 'fuessv30', 'fuemav30',
-     'fuevn100', 'fuessv50', 'fueip100', 'fuekiv30',
-     '069500', '360750', '379810', '458730', '381180', '465580', '459580', '364980', '229200', '104580'].some(kw =>
-       nameLower.includes(kw) || korLower.includes(kw) || tickerLower === kw || idLower.includes(kw)
-    )
+  // 1. Explicit ETF flag or industry
+  const isExplicitEtf = Boolean(stock.isEtf || (stock.industry && stock.industry.toUpperCase() === 'ETF'))
+
+  // 2. Known US & Global ETF Tickers (Exact Match)
+  const knownUsEtfTickers = new Set([
+    'qqq', 'tqqq', 'sqqq', 'spy', 'voo', 'ivv', 'schd', 'soxx', 'smh', 'jepi', 'jepq', 'vti',
+    'xlk', 'tlt', 'gld', 'vnm', 'dia', 'iemg', 'vwo', 'bnd', 'vnq', 'arkk', 'xle', 'xlf', 'xly', 'xlv'
+  ])
+
+  // 3. Known Vietnam ETF Tickers / Symbols (Exact Match)
+  const knownVnEtfTickers = new Set([
+    'fuevfvnd', 'e1vfvn30', 'fuessvfl', 'fuessv30', 'fuemav30', 'fuevn100', 'fuessv50', 'fueip100', 'fuekiv30'
+  ])
+
+  // 4. Known Korean ETF Tickers (Exact Match)
+  const knownKrEtfTickers = new Set([
+    '069500', '360750', '379810', '458730', '381180', '465580', '459580', '364980', '229200', '104580',
+    '133690', '448290', '448300', '465540', '122630', '252670', '233740', '114800', '251340', '277630'
+  ])
+
+  // 5. Korean ETF Brand Prefixes (Must start with the brand name or have space boundary)
+  const krEtfBrandPrefixes = [
+    'kodex', 'tiger', 'kbstar', 'ace ', 'sol ', 'plus ', 'rise ', 'hanaro ', 'timefolio ', 'kosef ', 'arirang '
+  ]
+  const isKrBrandEtf = krEtfBrandPrefixes.some(prefix => 
+    korLower.startsWith(prefix) || 
+    nameLower.startsWith(prefix) || 
+    korLower.includes(` ${prefix}`) || 
+    nameLower.includes(` ${prefix}`)
+  )
+
+  const isEtfFlag = isExplicitEtf || 
+    knownUsEtfTickers.has(tickerLower) || 
+    knownVnEtfTickers.has(tickerLower) || 
+    knownKrEtfTickers.has(tickerLower) || 
+    isKrBrandEtf
 
   if (!isEtfFlag) return null
 

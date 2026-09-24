@@ -54,18 +54,22 @@ export function calculateInvestmentValue(fairPrice: number, currentPrice: number
 
 /**
  * Calculates the Stock Temperature in Celsius (°C)
- * Temp = 30 * (Current Price / Fair Price) - 10
- * If fairPrice is 0 (Unvalued deficit / capital impairment): returns 100.0°C (Extreme Overvalued / High Risk)
+ * Temp = 24 * (Current Price / Fair Price) - 3
+ * - Ratio 1.0 (Fair Value) -> 21.0°C (Comfortable Transition/Fair Value)
+ * - Ratio 0.5 (Undervalued) -> 9.0°C (Spring)
+ * - Ratio 0.1 (Deep Undervalued) -> -0.6°C (Winter / Freezing)
+ * - Ratio 1.3 (Overvalued) -> 28.2°C (Summer)
+ * - Ratio 1.5+ (Deep Overvalued) -> 33.0°C+ (Hot Summer / Heatwave)
  */
 export function calculateStockTemperature(currentPrice: number, fairPrice: number): number {
-  if (currentPrice <= 0) return 20.0
+  if (currentPrice <= 0) return 21.0
   if (fairPrice <= 0) {
-    // 완전 자본잠식 또는 산출 불가 적자 기업 -> 최고 온도(100°C) 처리
-    return 100.0
+    // 완전 자본잠식 또는 산출 불가 적자 기업 -> 최고 온도(60°C) 처리
+    return 60.0
   }
-  const temp = 30 * (currentPrice / fairPrice) - 10
-  // Clamp values between -30°C and 100°C for sensible UI displays
-  return Number(Math.max(-30, Math.min(100, temp)).toFixed(1))
+  const temp = 24 * (currentPrice / fairPrice) - 3
+  // Clamp values between -25°C and 70°C for sensible UI displays
+  return Number(Math.max(-25, Math.min(70, temp)).toFixed(1))
 }
 
 export interface TemperatureState {
@@ -79,51 +83,57 @@ export interface TemperatureState {
 
 /**
  * Returns descriptive details and Tailwind color classes based on stock temperature
+ * Korean Real Seasonal Climate Benchmarks:
+ * - < 0°C: 겨울 (극저평가)
+ * - 0 ~ 16°C: 봄 (저평가)
+ * - 17 ~ 26°C: 가을 (적정가, 기준점: 21°C)
+ * - 27 ~ 32°C: 여름 (고평가)
+ * - ≥ 33°C: 한여름 (극고평가, 폭염 기준)
  */
 export function getTemperatureDetails(temp: number): TemperatureState {
   if (temp < 0) {
     return {
-      label: '극심한 저평가 (혹한기)',
+      label: '극저평가 (겨울)',
       colorClass: 'text-blue-400',
       badgeColorClass: 'bg-blue-950/80 text-blue-300 border-blue-900/50',
       gradientClass: 'from-blue-500 to-cyan-500',
-      description: '상승 여력 최대 · 역사적 저평가 저점 구간입니다.',
+      description: '기업 펀더멘털 대비 주가가 영하권(0°C 미만)의 극심한 저평가 구간에 머물러 있는 상태입니다.',
       iconName: 'snowflake',
     }
-  } else if (temp < 15) {
+  } else if (temp < 17) {
     return {
-      label: '저평가 구간 (쌀쌀함)',
+      label: '저평가 (봄)',
       colorClass: 'text-cyan-400',
       badgeColorClass: 'bg-cyan-950/80 text-cyan-300 border-cyan-900/50',
       gradientClass: 'from-cyan-500 to-teal-500',
-      description: '상승 여력 높음 · 주가 저평가 구간입니다.',
+      description: '초봄의 서늘한 기온(0~16°C)처럼 적정가치 대비 주가가 할인되어 상승 잠재력을 품은 상태입니다.',
       iconName: 'wind',
     }
-  } else if (temp < 35) {
+  } else if (temp < 27) {
     return {
-      label: '적정 밸류 (적정온도)',
+      label: '가을 (적정가)',
       colorClass: 'text-emerald-400',
       badgeColorClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-900/50',
       gradientClass: 'from-emerald-500 to-green-500',
-      description: '상승 여력 안정적 · 균형 가치 구간입니다.',
+      description: '가을철 쾌적한 평년 기온(17~26°C)처럼 실적과 기업 가치가 시장 평가와 조화로운 균형 상태입니다.',
       iconName: 'cloud-sun',
     }
-  } else if (temp < 50) {
+  } else if (temp < 33) {
     return {
-      label: '고평가 구간 (과열)',
+      label: '고평가 (여름)',
       colorClass: 'text-amber-400',
       badgeColorClass: 'bg-amber-950/80 text-amber-300 border-amber-900/50',
       gradientClass: 'from-amber-500 to-orange-500',
-      description: '단기 급등 상태 · 1년 목표가 근접 구간입니다.',
+      description: '여름철 더위(27~32°C)처럼 밸류에이션 지표가 평균 상단에 진입하여 과열 조짐을 보이는 상태입니다.',
       iconName: 'sun',
     }
   } else {
     return {
-      label: '극심한 고평가 (폭염)',
+      label: '극고평가 (한여름)',
       colorClass: 'text-rose-500',
       badgeColorClass: 'bg-rose-950/80 text-rose-300 border-rose-900/50',
       gradientClass: 'from-orange-500 to-rose-500',
-      description: '1년 목표가 초과 · 단기 과열 주의 구간입니다.',
+      description: '기상청 폭염특보(33°C 이상) 수준으로 역사적 밸류에이션 밴드 상단을 초과하여 극단적 과열에 도달한 상태입니다.',
       iconName: 'flame',
     }
   }

@@ -4,11 +4,13 @@ import Dashboard from './pages/Dashboard'
 import StockDetail from './pages/StockDetail'
 import Watchlist from './pages/Watchlist'
 import ScrollToTop from './components/ScrollToTop'
+import AndroidBackButtonHandler from './components/AndroidBackButtonHandler'
 
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <AndroidBackButtonHandler />
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
@@ -23,3 +25,4 @@ function App() {
 }
 
 export default App
+

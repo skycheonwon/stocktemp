@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { 
-  Search, Flame, Snowflake, Plus, Wind, Sun, Zap,
-  LogOut, Sparkles, User, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FolderHeart, ThumbsUp, Check
+  Search, Flame, Snowflake, Plus, Wind, Sun, Zap, Globe,
+  LogOut, Sparkles, User, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, FolderHeart, ThumbsUp, Check, RotateCcw
 } from 'lucide-react'
+
+
 import { 
   doc, setDoc, onSnapshot, collection, query, where 
 } from 'firebase/firestore'
@@ -20,6 +22,9 @@ import { generateAndSaveStockAnalysis, fetchLiveStockMetricsAndAnalysisWithGemin
 import SwipeableCard from '../components/SwipeableCard'
 import LoginInline from '../components/LoginInline'
 import StockDiscoverDeck from '../components/StockDiscoverDeck'
+import StockTempLogo from '../components/StockTempLogo'
+import TemperatureGuideModal from '../components/TemperatureGuideModal'
+
 import {
   calculateFairPrice,
   calculateStockTemperature,
@@ -28,17 +33,193 @@ import {
 } from '../utils/valuation'
 import { getEtfDetails } from '../utils/etfValuation'
 
-const INDICES_CONFIG: { translationKey: TranslationKey; temp: number }[] = [
-  { translationKey: 'kospi', temp: 37.1 },
-  { translationKey: 'kosdaq', temp: 18.2 },
-  { translationKey: 'sp500', temp: 42.5 },
-  { translationKey: 'nasdaq', temp: 48.3 },
-  { translationKey: 'shanghai', temp: 11.5 },
-  { translationKey: 'shenzhen', temp: 8.2 },
-  { translationKey: 'hangseng', temp: -3.5 },
-  { translationKey: 'vnindex', temp: 32.2 },
-  { translationKey: 'hnx', temp: 13.5 },
-  { translationKey: 'nikkei', temp: 22.4 },
+export interface SeasonTileDef {
+  id: 'spring' | 'summer' | 'hot_summer' | 'transition' | 'winter';
+  emoji: string;
+  nameKo: string;
+  nameEn: string;
+  nameVi: string;
+  tempRange: string;
+  valKo: string;
+  valEn: string;
+  valVi: string;
+  themeGradient: string;
+  themeShadow: string;
+  tempTagClass: string;
+  valTextClass: string;
+  titleColorClass: string;
+  iconName: 'flame' | 'sun' | 'cloud-sun' | 'wind' | 'snowflake';
+  animType: 'blossom' | 'sunbeam' | 'flame' | 'wind' | 'snow';
+}
+
+export const DEFAULT_SEASON_TILES: SeasonTileDef[] = [
+  {
+    id: 'spring',
+    emoji: '🌱',
+    iconName: 'wind',
+    nameKo: '봄',
+    nameEn: 'Spring',
+    nameVi: 'Mùa xuân',
+    tempRange: '0~16°C',
+    valKo: '저평가',
+    valEn: 'Low',
+    valVi: 'Định giá thấp',
+    themeGradient: 'from-cyan-950/50 via-slate-900/70 to-slate-950/90',
+    themeShadow: 'shadow-cyan-950/20 hover:shadow-cyan-500/25',
+    tempTagClass: 'text-cyan-300 bg-cyan-950/80',
+    valTextClass: 'text-cyan-400',
+    titleColorClass: 'text-cyan-300',
+    animType: 'blossom',
+  },
+  {
+    id: 'summer',
+    emoji: '☀️',
+    iconName: 'sun',
+    nameKo: '여름',
+    nameEn: 'Summer',
+    nameVi: 'Mùa hè',
+    tempRange: '27~32°C',
+    valKo: '고평가',
+    valEn: 'High',
+    valVi: 'Định giá cao',
+    themeGradient: 'from-amber-950/50 via-slate-900/70 to-slate-950/90',
+    themeShadow: 'shadow-amber-950/20 hover:shadow-amber-500/25',
+    tempTagClass: 'text-amber-300 bg-amber-950/80',
+    valTextClass: 'text-amber-400',
+    titleColorClass: 'text-amber-300',
+    animType: 'sunbeam',
+  },
+  {
+    id: 'hot_summer',
+    emoji: '🔥',
+    iconName: 'flame',
+    nameKo: '한여름',
+    nameEn: 'Hot Summer',
+    nameVi: 'Giữa hè',
+    tempRange: '≥ 33°C',
+    valKo: '극고평가',
+    valEn: 'Very High',
+    valVi: 'Định giá cực cao',
+    themeGradient: 'from-rose-950/50 via-slate-900/70 to-slate-950/90',
+    themeShadow: 'shadow-rose-950/20 hover:shadow-rose-500/25',
+    tempTagClass: 'text-rose-300 bg-rose-950/80',
+    valTextClass: 'text-rose-400',
+    titleColorClass: 'text-rose-300',
+    animType: 'flame',
+  },
+  {
+    id: 'transition',
+    emoji: '🍂',
+    iconName: 'cloud-sun',
+    nameKo: '가을',
+    nameEn: 'Autumn',
+    nameVi: 'Mùa thu',
+    tempRange: '17~26°C',
+    valKo: '적정가',
+    valEn: 'Fair',
+    valVi: 'Giá hợp lý',
+    themeGradient: 'from-emerald-950/50 via-slate-900/70 to-slate-950/90',
+    themeShadow: 'shadow-emerald-950/20 hover:shadow-emerald-500/25',
+    tempTagClass: 'text-emerald-300 bg-emerald-950/80',
+    valTextClass: 'text-emerald-400',
+    titleColorClass: 'text-emerald-300',
+    animType: 'wind',
+  },
+  {
+    id: 'winter',
+    emoji: '❄️',
+    iconName: 'snowflake',
+    nameKo: '겨울',
+    nameEn: 'Winter',
+    nameVi: 'Mùa đông',
+    tempRange: '< 0°C',
+    valKo: '극저평가',
+    valEn: 'Very Low',
+    valVi: 'Định giá cực thấp',
+    themeGradient: 'from-blue-950/50 via-slate-900/70 to-slate-950/90',
+    themeShadow: 'shadow-blue-950/20 hover:shadow-blue-500/25',
+    tempTagClass: 'text-blue-300 bg-blue-950/80',
+    valTextClass: 'text-blue-400',
+    titleColorClass: 'text-blue-300',
+    animType: 'snow',
+  },
+]
+
+
+interface CountryIndexGroup {
+  countryKey: string;
+  nameKo: string;
+  nameEn: string;
+  nameVi: string;
+  flag: string;
+  indices: { translationKey: TranslationKey; temp: number }[];
+}
+
+const COUNTRY_INDICES_CONFIG: CountryIndexGroup[] = [
+  {
+    countryKey: 'KR',
+    nameKo: '대한민국',
+    nameEn: 'S.Korea',
+    nameVi: 'Hàn Quốc',
+    flag: '🇰🇷',
+    indices: [
+      { translationKey: 'kospi', temp: 28.5 },
+      { translationKey: 'kosdaq', temp: 19.2 },
+    ],
+  },
+  {
+    countryKey: 'US',
+    nameKo: '미국',
+    nameEn: 'USA',
+    nameVi: 'Hoa Kỳ',
+    flag: '🇺🇸',
+    indices: [
+      { translationKey: 'sp500', temp: 31.0 },
+      { translationKey: 'nasdaq', temp: 34.5 },
+    ],
+  },
+  {
+    countryKey: 'CN',
+    nameKo: '중국',
+    nameEn: 'China',
+    nameVi: 'Trung Quốc',
+    flag: '🇨🇳',
+    indices: [
+      { translationKey: 'shanghai', temp: 14.5 },
+      { translationKey: 'shenzhen', temp: 12.0 },
+    ],
+  },
+  {
+    countryKey: 'HK',
+    nameKo: '홍콩',
+    nameEn: 'Hong Kong',
+    nameVi: 'Hồng Kông',
+    flag: '🇭🇰',
+    indices: [
+      { translationKey: 'hangseng', temp: -2.5 },
+    ],
+  },
+  {
+    countryKey: 'VN',
+    nameKo: '베트남',
+    nameEn: 'Vietnam',
+    nameVi: 'Việt Nam',
+    flag: '🇻🇳',
+    indices: [
+      { translationKey: 'vnindex', temp: 24.5 },
+      { translationKey: 'hnx', temp: 15.0 },
+    ],
+  },
+  {
+    countryKey: 'JP',
+    nameKo: '일본',
+    nameEn: 'Japan',
+    nameVi: 'Nhật Bản',
+    flag: '🇯🇵',
+    indices: [
+      { translationKey: 'nikkei', temp: 25.0 },
+    ],
+  },
 ]
 
 function isSubsequence(query: string, text: string): boolean {
@@ -55,6 +236,7 @@ function isSubsequence(query: string, text: string): boolean {
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [guideModalOpen, setGuideModalOpen] = useState(false)
   const { t, language } = useLanguage()
   const [selectedCountry, setSelectedCountry] = useState<'ALL' | 'KR' | 'US' | 'VN' | 'CN'>(() => {
     return language === 'KO' ? 'KR' : language === 'VI' ? 'VN' : 'US'
@@ -63,6 +245,7 @@ export default function Dashboard() {
   const { stocks, prices, eps } = useLivePrices()
   const { user, logout } = useAuth()
   const isFiltered = selectedCountry !== 'ALL' || selectedIndustry !== 'ALL'
+
 
   // Automatically sync selected country when language changes
   useEffect(() => {
@@ -220,6 +403,65 @@ export default function Dashboard() {
   const [catalogSearchQuery, setCatalogSearchQuery] = useState('')
   const [autoFilledNotice, setAutoFilledNotice] = useState('')
 
+  // 5 Seasonal Hero Tiles Customizable Order & Touch Animation State
+  const [seasonTiles, setSeasonTiles] = useState<SeasonTileDef[]>(() => {
+    try {
+      const saved = localStorage.getItem('stocktemp_season_order')
+      if (saved) {
+        const ids: string[] = JSON.parse(saved)
+        const mapped = ids.map(id => DEFAULT_SEASON_TILES.find(t => t.id === id)).filter(Boolean) as SeasonTileDef[]
+        if (mapped.length === DEFAULT_SEASON_TILES.length) return mapped
+      }
+    } catch (e) {}
+    return DEFAULT_SEASON_TILES
+  })
+
+  const isCustomSeasonOrder = useMemo(() => {
+    return seasonTiles.map(t => t.id).join(',') !== DEFAULT_SEASON_TILES.map(t => t.id).join(',')
+  }, [seasonTiles])
+
+  const [activeSeasonAnim, setActiveSeasonAnim] = useState<string | null>(null)
+  const animTimerRef = useRef<any>(null)
+
+  const triggerSeasonAnimation = (id: string) => {
+    if (animTimerRef.current) clearTimeout(animTimerRef.current)
+    setActiveSeasonAnim(id)
+    animTimerRef.current = setTimeout(() => {
+      setActiveSeasonAnim(null)
+    }, 2800)
+  }
+
+  const [draggedTileId, setDraggedTileId] = useState<string | null>(null)
+  const [dragOverTileId, setDragOverTileId] = useState<string | null>(null)
+
+  const handleTileDrop = (targetId: string) => {
+    if (!draggedTileId || draggedTileId === targetId) {
+      setDraggedTileId(null)
+      setDragOverTileId(null)
+      return
+    }
+    const fromIndex = seasonTiles.findIndex(t => t.id === draggedTileId)
+    const toIndex = seasonTiles.findIndex(t => t.id === targetId)
+    if (fromIndex !== -1 && toIndex !== -1) {
+      const newOrder = [...seasonTiles]
+      const [moved] = newOrder.splice(fromIndex, 1)
+      newOrder.splice(toIndex, 0, moved)
+      setSeasonTiles(newOrder)
+      try {
+        localStorage.setItem('stocktemp_season_order', JSON.stringify(newOrder.map(t => t.id)))
+      } catch (e) {}
+    }
+    setDraggedTileId(null)
+    setDragOverTileId(null)
+  }
+
+  const resetSeasonOrder = () => {
+    setSeasonTiles(DEFAULT_SEASON_TILES)
+    try {
+      localStorage.removeItem('stocktemp_season_order')
+    } catch (e) {}
+  }
+
   // Filter catalog suggestions with flexible matching (whitespace-insensitive)
   const catalogSuggestions = useMemo(() => {
     const raw = catalogSearchQuery.trim()
@@ -259,10 +501,10 @@ export default function Dashboard() {
     setCatalogSearchQuery('')
   }
 
-  // Scroll buttons handlers for horizontal indices tape
+  // Horizontal scroll buttons handlers for indices tape
   const scrollIndices = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
-      const scrollAmount = direction === 'left' ? -300 : 300
+      const scrollAmount = direction === 'left' ? -260 : 260
       scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
     }
   }
@@ -456,13 +698,13 @@ export default function Dashboard() {
         if (targetStock.temperature < 0) {
           setCol1Tab('extreme_cold')
           setMobileListTab('extreme_cold')
-        } else if (targetStock.temperature < 15) {
+        } else if (targetStock.temperature < 17) {
           setCol1Tab('cold')
           setMobileListTab('cold')
-        } else if (targetStock.temperature > 40) {
+        } else if (targetStock.temperature >= 33) {
           setCol2Tab('extreme_hot')
           setMobileListTab('extreme_hot')
-        } else if (targetStock.temperature > 25) {
+        } else if (targetStock.temperature >= 27) {
           setCol2Tab('hot')
           setMobileListTab('hot')
         } else {
@@ -532,34 +774,34 @@ export default function Dashboard() {
     return isFiltered ? list : list.slice(0, 10)
   }, [filteredStocks, isFiltered])
 
-  // 2. Normal Cold (0°C ~ 15°C - 쌀쌀함 저평가)
+  // 2. Normal Cold (0°C ~ 16°C - 쌀쌀함 저평가)
   const normalColdStocks = useMemo(() => {
     const list = [...filteredStocks]
-      .filter((s) => s.temperature >= 0 && s.temperature < 15)
+      .filter((s) => s.temperature >= 0 && s.temperature < 17)
       .sort((a, b) => a.temperature - b.temperature)
     return isFiltered ? list : list.slice(0, 10)
   }, [filteredStocks, isFiltered])
 
-  // 3. Fair / Stable (15°C ~ 25°C - 쾌적 안정주)
+  // 3. Fair / Stable (17°C ~ 26°C - 쾌적 안정주)
   const fairStocks = useMemo(() => {
     const list = [...filteredStocks]
-      .filter((s) => s.temperature >= 15 && s.temperature <= 25)
+      .filter((s) => s.temperature >= 17 && s.temperature < 27)
       .sort((a, b) => a.temperature - b.temperature)
     return isFiltered ? list : list.slice(0, 10)
   }, [filteredStocks, isFiltered])
 
-  // 4. Normal Hot (25°C ~ 40°C - 따뜻함/과열)
+  // 4. Normal Hot (27°C ~ 32°C - 따뜻함/여름)
   const normalHotStocks = useMemo(() => {
     const list = [...filteredStocks]
-      .filter((s) => s.temperature > 25 && s.temperature <= 40)
+      .filter((s) => s.temperature >= 27 && s.temperature < 33)
       .sort((a, b) => b.temperature - a.temperature)
     return isFiltered ? list : list.slice(0, 10)
   }, [filteredStocks, isFiltered])
 
-  // 5. Extreme Hot (> 40°C - 폭염 위험주)
+  // 5. Extreme Hot (>= 33°C - 폭염 위험주)
   const extremeHotStocks = useMemo(() => {
     const list = [...filteredStocks]
-      .filter((s) => s.temperature > 40)
+      .filter((s) => s.temperature >= 33)
       .sort((a, b) => b.temperature - a.temperature)
     return isFiltered ? list : list.slice(0, 10)
   }, [filteredStocks, isFiltered])
@@ -1166,116 +1408,254 @@ export default function Dashboard() {
         <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-36 h-36 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
         
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-          {/* Left Column: Title and Description */}
-          <div className="space-y-3 text-left">
-            <h2 className="text-xl md:text-2xl font-black text-slate-100 flex items-center gap-2">
-              <Sparkles className="w-5.5 h-5.5 text-blue-400 animate-pulse" />
-              <span>{t('heroTitle')}</span>
-            </h2>
-            <p className="text-xs md:text-sm text-slate-450 leading-relaxed font-medium">
-              {t('heroDesc')}
-            </p>
-            <p className="text-xs md:text-sm text-blue-300/90 leading-relaxed font-medium">
-              {t('heroCommunityDesc')}
-            </p>
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Left Column: Storytelling Headline, 2*2+1 Seasonal Cycle Visual, and Trust Badges */}
+          <div className="space-y-4 text-left">
+            {/* Main Punchy Headline */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2.5">
+                <StockTempLogo size="sm" />
+                <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-100">
+                  {t('heroTitle')}
+                </h2>
+              </div>
+              <p className="text-xs md:text-sm text-slate-350 font-medium leading-relaxed">
+                {t('heroDesc')}
+              </p>
+            </div>
+
+            {/* 5 Seasonal Cycle Interactive Cards (3x2 Grid: 5 Equal Cards + 1 Empty Slot, Top-Right Icon, Center Temp, 1-Line Status) */}
+            <div className="space-y-2 pt-1">
+              {isCustomSeasonOrder && (
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={resetSeasonOrder}
+                    className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 font-medium transition-colors cursor-pointer bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-full border border-slate-700/60 shadow-sm"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>{language === 'KO' ? '기본 순서로 리셋' : language === 'VI' ? 'Đặt lại thứ tự' : 'Reset Order'}</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2 sm:gap-2.5 select-none">
+                {seasonTiles.map((tile) => {
+                  const isAnimActive = activeSeasonAnim === tile.id
+                  const isDragged = draggedTileId === tile.id
+                  const isOver = dragOverTileId === tile.id
+                  const titleText = language === 'KO' ? tile.nameKo : language === 'VI' ? tile.nameVi : tile.nameEn
+                  const valText = language === 'KO' ? tile.valKo : language === 'VI' ? tile.valVi : tile.valEn
+
+                  return (
+                    <div
+                      key={tile.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', tile.id)
+                        setDraggedTileId(tile.id)
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        if (draggedTileId !== tile.id) {
+                          setDragOverTileId(tile.id)
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        handleTileDrop(tile.id)
+                      }}
+                      onDragEnd={() => {
+                        setDraggedTileId(null)
+                        setDragOverTileId(null)
+                      }}
+                      onClick={() => triggerSeasonAnimation(tile.id)}
+                      onTouchStart={() => triggerSeasonAnimation(tile.id)}
+                      className={`group/tile relative p-2.5 sm:p-3.5 rounded-2xl bg-gradient-to-b ${tile.themeGradient} ${tile.themeShadow} ${
+                        isDragged ? 'opacity-40 scale-95' : 'opacity-100'
+                      } ${isOver ? 'ring-2 ring-blue-400/80 scale-105' : ''} transition-all duration-300 flex flex-col justify-between overflow-hidden cursor-grab active:cursor-grabbing min-h-[96px] sm:min-h-[105px] shadow-lg`}
+                    >
+                      {/* Hover & Touch Particle Animation Layer */}
+                      {tile.animType === 'blossom' && (
+                        <div className={`absolute inset-0 pointer-events-none ${isAnimActive ? 'opacity-100' : 'opacity-0'} group-hover/tile:opacity-100 transition-opacity duration-300 overflow-hidden z-0`}>
+                          <span className="absolute top-2 left-2 text-sm anim-blossom-1">🌸</span>
+                          <span className="absolute bottom-3 right-3 text-xs anim-blossom-2">🍃</span>
+                          <span className="absolute top-4 right-2 text-sm anim-blossom-3">🌸</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-cyan-500/10 to-transparent" />
+                        </div>
+                      )}
+                      {tile.animType === 'sunbeam' && (
+                        <div className={`absolute inset-0 pointer-events-none ${isAnimActive ? 'opacity-100' : 'opacity-0'} group-hover/tile:opacity-100 transition-opacity duration-300 overflow-hidden z-0 flex items-center justify-center`}>
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-amber-400/20 rounded-full blur-md anim-sunbeam" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 to-transparent" />
+                        </div>
+                      )}
+                      {tile.animType === 'flame' && (
+                        <div className={`absolute inset-0 pointer-events-none ${isAnimActive ? 'opacity-100' : 'opacity-0'} group-hover/tile:opacity-100 transition-opacity duration-300 overflow-hidden z-0`}>
+                          <span className="absolute bottom-2 left-2 text-sm anim-flame-1">🔥</span>
+                          <span className="absolute bottom-3 right-3 text-xs anim-flame-2">✨</span>
+                          <span className="absolute bottom-1 left-1/2 text-sm anim-flame-3">💥</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-rose-500/15 to-transparent" />
+                        </div>
+                      )}
+                      {tile.animType === 'wind' && (
+                        <div className={`absolute inset-0 pointer-events-none ${isAnimActive ? 'opacity-100' : 'opacity-0'} group-hover/tile:opacity-100 transition-opacity duration-300 overflow-hidden z-0`}>
+                          <span className="absolute top-3 left-2 text-sm anim-wind-1">🍃</span>
+                          <span className="absolute bottom-2 left-3 text-xs anim-wind-2">💨</span>
+                          <span className="absolute top-1/2 left-1 text-sm anim-wind-3">🍂</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/10 to-transparent" />
+                        </div>
+                      )}
+                      {tile.animType === 'snow' && (
+                        <div className={`absolute inset-0 pointer-events-none ${isAnimActive ? 'opacity-100' : 'opacity-0'} group-hover/tile:opacity-100 transition-opacity duration-300 overflow-hidden z-0`}>
+                          <span className="absolute -top-1 left-3 text-sm anim-snow-1">❄️</span>
+                          <span className="absolute -top-1 left-1/2 text-xs anim-snow-2">❄️</span>
+                          <span className="absolute -top-1 right-3 text-sm anim-snow-3">❄️</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-blue-500/10 to-transparent" />
+                        </div>
+                      )}
+
+                      {/* Top Row: Empty Left / Weather Icon at Top Right */}
+                      <div className="flex items-center justify-end relative z-10">
+                        <WeatherIcon
+                          name={tile.iconName}
+                          className="w-5 h-5 group-hover/tile:scale-125 transition-transform duration-300"
+                        />
+                      </div>
+
+                      {/* Center: Large Temperature Text */}
+                      <div className="relative z-10 text-center -mt-1">
+                        <span className={`text-sm sm:text-base md:text-lg font-mono font-black tracking-tight block ${tile.titleColorClass}`}>
+                          {tile.tempRange}
+                        </span>
+                      </div>
+
+                      {/* Bottom Row: 1-Line Status Label (예: 봄 (저평가) / 여름 (고평가)) */}
+                      <div className="relative z-10 text-center">
+                        <span className="text-[11px] sm:text-xs font-bold block truncate text-slate-200">
+                          {titleText} ({valText})
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* 6th Slot: Clean Empty Space */}
+                <div className="invisible select-none pointer-events-none" aria-hidden="true" />
+              </div>
+            </div>
           </div>
 
-          {/* Right Column: Embedded Horizontal Scrolling Indices Card tape with Left/Right Buttons */}
-          <div className="relative select-none w-full overflow-hidden group/indices">
-            {/* Left Scroll Button (Desktop only) */}
-            <button
-              type="button"
-              onClick={() => scrollIndices('left')}
-              className="hidden md:flex absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750/50 items-center justify-center shadow-xl transition-all cursor-pointer backdrop-blur-sm opacity-80 group-hover/indices:opacity-100"
-              aria-label="Scroll left"
-            >
-              <ChevronLeft className="w-4.5 h-4.5" />
-            </button>
+          {/* Right Column: Global Market Seasons Section */}
+          <div className="space-y-4 text-left">
+            {/* Header: Symmetric with Left Column */}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-400 shrink-0" />
+                <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-100">
+                  {t('marketSeasonsTitle')}
+                </h2>
+              </div>
+              <p className="text-xs md:text-sm text-slate-350 font-medium leading-relaxed">
+                {t('marketSeasonsDesc')}
+              </p>
+            </div>
 
-            {/* Right Scroll Button (Desktop only) */}
-            <button
-              type="button"
-              onClick={() => scrollIndices('right')}
-              className="hidden md:flex absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-750/50 items-center justify-center shadow-xl transition-all cursor-pointer backdrop-blur-sm opacity-80 group-hover/indices:opacity-100"
-              aria-label="Scroll right"
-            >
-              <ChevronRight className="w-4.5 h-4.5" />
-            </button>
+            {/* Country Market Season Cards - Borderless with Floating Semi-transparent Arrows (Hidden on Mobile) */}
+            <div className="space-y-2 pt-1 relative group">
+              {/* Left Floating Arrow Button with Transparency (Desktop Only) */}
+              <button
+                type="button"
+                onClick={() => scrollIndices('left')}
+                className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-slate-950/70 hover:bg-slate-900/95 text-slate-300 hover:text-white backdrop-blur-md shadow-xl border border-slate-700/40 opacity-80 hover:opacity-100 transition-all cursor-pointer active:scale-90 items-center justify-center -ml-1 sm:-ml-2"
+                title={language === 'KO' ? '이전 지수' : 'Previous'}
+                aria-label="Previous indices"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
 
-            <div className="hidden md:block absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-slate-950 to-transparent z-10 pointer-events-none" />
-            <div className="hidden md:block absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-slate-950 to-transparent z-10 pointer-events-none" />
-            
-            <div
-              ref={scrollRef}
-              className="flex gap-3.5 overflow-x-auto py-3 px-2 md:px-8 scrollbar-none scroll-smooth cursor-grab active:cursor-grabbing"
-            >
-              {INDICES_CONFIG.map((idx, index) => {
-                const displayTemp = `${idx.temp}` // No plus prefix for positive temperatures
-                const tempDetails = getTemperatureDetails(idx.temp)
-                
-                // Custom simplified label for index card badge matching the 5 levels
-                const label = idx.temp >= 50
-                  ? (language === 'KO' ? '극단적 고평가' : language === 'VI' ? 'Định giá cực cao' : 'Extreme Overvalued')
-                  : idx.temp >= 35
-                    ? (language === 'KO' ? '고평가' : language === 'VI' ? 'Định giá cao' : 'Overvalued')
-                    : idx.temp >= 15
-                      ? (language === 'KO' ? '적정가' : language === 'VI' ? 'Hợp lý' : 'Fair')
-                      : idx.temp >= 0
-                        ? (language === 'KO' ? '저평가' : language === 'VI' ? 'Định giá thấp' : 'Undervalued')
-                        : (language === 'KO' ? '극심한 저평가' : language === 'VI' ? 'Định giá cực thấp' : 'Extreme Undervalued')
+              {/* Right Floating Arrow Button with Transparency (Desktop Only) */}
+              <button
+                type="button"
+                onClick={() => scrollIndices('right')}
+                className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-20 p-2 rounded-full bg-slate-950/70 hover:bg-slate-900/95 text-slate-300 hover:text-white backdrop-blur-md shadow-xl border border-slate-700/40 opacity-80 hover:opacity-100 transition-all cursor-pointer active:scale-90 items-center justify-center -mr-1 sm:-mr-2"
+                title={language === 'KO' ? '다음 지수' : 'Next'}
+                aria-label="Next indices"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
 
-                // Color-only styling for badges without outlines
-                const badgeColorClass = idx.temp >= 50
-                  ? 'bg-rose-950/80 text-rose-300 border border-rose-900/50'
-                  : idx.temp >= 35
-                    ? 'bg-amber-950/80 text-amber-300 border border-amber-900/50'
-                    : idx.temp >= 15
-                      ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-900/50'
-                      : idx.temp >= 0
-                        ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-900/50'
-                        : 'bg-blue-950/80 text-blue-300 border border-blue-900/50'
+              <div ref={scrollRef} className="flex items-stretch gap-3 overflow-x-auto pb-2 px-1 scrollbar-none select-none">
+                {COUNTRY_INDICES_CONFIG.map((group) => {
+                  const countryName = language === 'KO' ? group.nameKo : language === 'VI' ? group.nameVi : group.nameEn
 
-                const weatherIconColorClass = idx.temp >= 50
-                  ? 'text-rose-550'
-                  : idx.temp >= 35
-                    ? 'text-amber-500'
-                    : idx.temp >= 15
-                      ? 'text-emerald-500'
-                      : idx.temp >= 0
-                        ? 'text-cyan-400'
-                        : 'text-blue-400'
+                  return (
+                    <div
+                      key={group.countryKey}
+                      className="flex-shrink-0 bg-gradient-to-br from-slate-900/90 via-slate-925/80 to-slate-950/90 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between shadow-xl backdrop-blur-sm"
+                    >
+                      {/* Top: Country Header with Gradient Underline */}
+                      <div className="pb-2 mb-2">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="text-sm sm:text-base leading-none">{group.flag}</span>
+                          <span className="text-xs font-bold text-slate-200 tracking-tight">{countryName}</span>
+                        </div>
+                        <div className="h-[1px] w-full bg-gradient-to-r from-slate-700/50 via-slate-600/20 to-transparent" />
+                      </div>
 
-                const tempColorClass = idx.temp >= 50
-                  ? 'text-rose-500'
-                  : idx.temp >= 35
-                    ? 'text-amber-400'
-                    : idx.temp >= 15
-                      ? 'text-emerald-400'
-                      : idx.temp >= 0
-                        ? 'text-cyan-400'
-                        : 'text-blue-400'
+                      {/* Index Cards List inside Country (No border, pure gradient boundaries) */}
+                      <div className="flex items-center gap-2">
+                        {group.indices.map((idx) => {
+                          const matchedTile = idx.temp < 0 
+                            ? DEFAULT_SEASON_TILES.find(t => t.id === 'winter')!
+                            : idx.temp < 17 
+                            ? DEFAULT_SEASON_TILES.find(t => t.id === 'spring')!
+                            : idx.temp < 27 
+                            ? DEFAULT_SEASON_TILES.find(t => t.id === 'transition')!
+                            : idx.temp < 33 
+                            ? DEFAULT_SEASON_TILES.find(t => t.id === 'summer')!
+                            : DEFAULT_SEASON_TILES.find(t => t.id === 'hot_summer')!
 
-                return (
-                  <div
-                    key={index}
-                    className="w-36 h-28 flex flex-col justify-between items-center bg-slate-955/45 rounded-2xl p-3.5 shrink-0 transition-colors animate-in zoom-in-95 duration-200 border-none"
-                  >
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                      {t(idx.translationKey)}
-                    </span>
-                    <span className={`text-base font-mono font-black mt-1 block ${tempColorClass}`}>
-                      {displayTemp}°C
-                    </span>
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <WeatherIcon name={tempDetails.iconName} className={`w-5 h-5 ${weatherIconColorClass}`} />
-                      <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold select-none leading-none tracking-wide ${badgeColorClass}`}>
-                        {label}
-                      </span>
+                          const titleText = language === 'KO' ? matchedTile.nameKo : language === 'VI' ? matchedTile.nameVi : matchedTile.nameEn
+                          const valText = language === 'KO' ? matchedTile.valKo : language === 'VI' ? matchedTile.valVi : matchedTile.valEn
+
+                          return (
+                            <div
+                              key={idx.translationKey}
+                              className={`relative p-2.5 sm:p-3 rounded-2xl bg-gradient-to-b ${matchedTile.themeGradient} ${matchedTile.themeShadow} flex flex-col justify-between overflow-hidden min-h-[96px] sm:min-h-[105px] min-w-[110px] sm:min-w-[125px] shadow-lg transition-all duration-300`}
+                            >
+                              {/* Top Row: Index Name & Weather Icon */}
+                              <div className="flex items-center justify-between relative z-10 gap-1">
+                                <span className="text-[11px] sm:text-xs font-black tracking-tight text-slate-100 truncate">
+                                  {t(idx.translationKey)}
+                                </span>
+                                <WeatherIcon
+                                  name={matchedTile.iconName}
+                                  className="w-4 h-4 shrink-0"
+                                />
+                              </div>
+
+                              {/* Center: Large Temperature Text */}
+                              <div className="relative z-10 text-center -mt-0.5">
+                                <span className={`text-sm sm:text-base md:text-lg font-mono font-black tracking-tight block ${matchedTile.titleColorClass}`}>
+                                  {idx.temp.toFixed(1)}°C
+                                </span>
+                              </div>
+
+                              {/* Bottom Row: 1-Line Status Label (예: 여름 (고평가)) */}
+                              <div className="relative z-10 text-center">
+                                <span className="text-[10px] sm:text-[11px] font-bold block truncate text-slate-200">
+                                  {titleText} ({valText})
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -2389,9 +2769,15 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+
+      {/* Temperature Guide Modal */}
+      <TemperatureGuideModal isOpen={guideModalOpen} onClose={() => setGuideModalOpen(false)} />
     </div>
   )
 }
+
+
 
 function StockCard({ stock, rank, isHighlighted }: { stock: any; rank?: number; isHighlighted?: boolean }) {
   const { t, language } = useLanguage()
@@ -2400,15 +2786,15 @@ function StockCard({ stock, rank, isHighlighted }: { stock: any; rank?: number; 
   let tempLabel = stock.tempDetails.label
   if (language === 'EN') {
     if (stock.temperature < 0) tempLabel = t('tempFreezingLabel')
-    else if (stock.temperature < 15) tempLabel = t('tempCoolLabel')
-    else if (stock.temperature < 35) tempLabel = t('tempNormalLabel')
-    else if (stock.temperature < 50) tempLabel = t('tempWarmLabel')
+    else if (stock.temperature < 17) tempLabel = t('tempCoolLabel')
+    else if (stock.temperature < 27) tempLabel = t('tempNormalLabel')
+    else if (stock.temperature < 33) tempLabel = t('tempWarmLabel')
     else tempLabel = t('tempHotLabel')
   } else if (language === 'VI') {
     if (stock.temperature < 0) tempLabel = t('tempFreezingLabel')
-    else if (stock.temperature < 15) tempLabel = t('tempCoolLabel')
-    else if (stock.temperature < 35) tempLabel = t('tempNormalLabel')
-    else if (stock.temperature < 50) tempLabel = t('tempWarmLabel')
+    else if (stock.temperature < 17) tempLabel = t('tempCoolLabel')
+    else if (stock.temperature < 27) tempLabel = t('tempNormalLabel')
+    else if (stock.temperature < 33) tempLabel = t('tempWarmLabel')
     else tempLabel = t('tempHotLabel')
   }
 

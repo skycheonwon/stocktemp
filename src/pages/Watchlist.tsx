@@ -101,15 +101,15 @@ export default function Watchlist() {
             let tempLabel = stock.tempDetails.label
             if (language === 'EN') {
               if (stock.temperature < 0) tempLabel = t('tempFreezingLabel')
-              else if (stock.temperature < 15) tempLabel = t('tempCoolLabel')
-              else if (stock.temperature <= 25) tempLabel = t('tempNormalLabel')
-              else if (stock.temperature <= 45) tempLabel = t('tempWarmLabel')
+              else if (stock.temperature < 17) tempLabel = t('tempCoolLabel')
+              else if (stock.temperature < 27) tempLabel = t('tempNormalLabel')
+              else if (stock.temperature < 33) tempLabel = t('tempWarmLabel')
               else tempLabel = t('tempHotLabel')
             } else if (language === 'VI') {
               if (stock.temperature < 0) tempLabel = t('tempFreezingLabel')
-              else if (stock.temperature < 15) tempLabel = t('tempCoolLabel')
-              else if (stock.temperature <= 25) tempLabel = t('tempNormalLabel')
-              else if (stock.temperature <= 45) tempLabel = t('tempWarmLabel')
+              else if (stock.temperature < 17) tempLabel = t('tempCoolLabel')
+              else if (stock.temperature < 27) tempLabel = t('tempNormalLabel')
+              else if (stock.temperature < 33) tempLabel = t('tempWarmLabel')
               else tempLabel = t('tempHotLabel')
             }
 

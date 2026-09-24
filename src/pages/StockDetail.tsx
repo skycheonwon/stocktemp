@@ -24,6 +24,7 @@ import { WeatherIcon } from '../components/WeatherIcon'
 import LoginInline from '../components/LoginInline'
 import OpinionReplies from '../components/OpinionReplies'
 import { getEtfDetails } from '../utils/etfValuation'
+import { checkAndTriggerDailyAgentSimulation } from '../utils/aiInvestorAgents'
 
 export default function StockDetail() {
   const { id } = useParams<{ id: string }>()
@@ -155,6 +156,23 @@ export default function StockDetail() {
     })
     return () => unsubscribe()
   }, [id])
+
+  // 3. Autonomous Natural Investor Agent Activity (2~3 times daily frequency)
+  useEffect(() => {
+    if (!id || !stock) return
+    const currentPrice = prices[stock.id] ?? stock.currentPrice
+    const fairPrice = calculateFairPrice(stock.eps, stock.defaultTargetPe || 15)
+    const temp = calculateStockTemperature(currentPrice, fairPrice)
+
+    checkAndTriggerDailyAgentSimulation(id, {
+      name: language === 'KO' ? (stock.koreanName || stock.name) : stock.name,
+      ticker: stock.ticker,
+      currentPrice,
+      fairPrice,
+      temperature: temp,
+      industry: stock.industry
+    }).catch((e) => console.warn('Agent simulation error:', e))
+  }, [id, stock?.id])
 
   // One-click Toggle Vote (UP or DOWN)
   const handleVoteToggle = async (targetType: 'up' | 'down') => {
@@ -356,7 +374,7 @@ export default function StockDetail() {
   const stockTemp = calculateStockTemperature(currentPrice, fairPrice)
 
   const getLocalizedTempDetails = (temp: number, t: any) => {
-    if (temp <= -2.5) {
+    if (temp < 0) {
       return {
         label: t('tempFreezingLabel'),
         description: t('tempFreezingDesc'),
@@ -366,33 +384,33 @@ export default function StockDetail() {
         iconName: 'snowflake' as const,
         tempVal: `${temp}°C`,
       }
-    } else if (temp < 12.5) {
+    } else if (temp < 17) {
       return {
         label: t('tempCoolLabel'),
         description: t('tempCoolDesc'),
         colorClass: 'text-cyan-400',
         badgeColorClass: 'bg-cyan-950/80 text-cyan-300 border-cyan-900/50',
-        emoji: '🔵',
+        emoji: '🌱',
         iconName: 'wind' as const,
         tempVal: `${temp}°C`,
       }
-    } else if (temp <= 27.5) {
+    } else if (temp < 27) {
       return {
         label: t('tempNormalLabel'),
         description: t('tempNormalDesc'),
         colorClass: 'text-emerald-400',
         badgeColorClass: 'bg-emerald-950/80 text-emerald-300 border-emerald-900/50',
-        emoji: '🟢',
+        emoji: '⛅',
         iconName: 'cloud-sun' as const,
         tempVal: `${temp}°C`,
       }
-    } else if (temp <= 42.5) {
+    } else if (temp < 33) {
       return {
         label: t('tempWarmLabel'),
         description: t('tempWarmDesc'),
         colorClass: 'text-amber-400',
         badgeColorClass: 'bg-amber-950/80 text-amber-300 border-amber-900/50',
-        emoji: '🟠',
+        emoji: '☀️',
         iconName: 'sun' as const,
         tempVal: `${temp}°C`,
       }
@@ -402,12 +420,13 @@ export default function StockDetail() {
         description: t('tempHotDesc'),
         colorClass: 'text-rose-500',
         badgeColorClass: 'bg-rose-950/80 text-rose-300 border-rose-900/50',
-        emoji: '🔴',
+        emoji: '🔥',
         iconName: 'flame' as const,
         tempVal: `${temp}°C`,
       }
     }
   }
+
 
   const tempDetails = isAwaitingSync ? {
     label: language === 'KO' ? '대기 중' : language === 'VI' ? 'Đang chờ' : 'Pending',
