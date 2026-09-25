@@ -88,10 +88,10 @@ export default function LegalModal({ isOpen, initialTab = 'terms', onClose }: Le
                 </h4>
                 <p>
                   {language === 'KO'
-                    ? '본 약관은 Công ty TNHH Templock Vietnam (이하 "회사")이 제공하는 StockTemp(stocktemp.com) 웹 플랫폼의 이용 조건 및 절차, 이용자와 회사의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다. 본 서비스는 공개된 금융 API를 바탕으로 한 가상의 시뮬레이션 및 데이터 시각화 툴입니다.'
+                    ? '본 약관은 Công ty TNHH Templock Vietnam (이하 "회사")이 제공하는 StockTemp(stocktemp.com) 웹 플랫폼의 이용 조건 및 절차, 이용자와 회사의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다. 본 서비스는 공개된 금융 API 및 알고리즘을 바탕으로 한 시뮬레이션 및 데이터 시각화 툴이며, 플랫폼 내 일부 토론 및 투표 데이터는 서비스 시연 및 시뮬레이션 알고리즘에 의해 생성된 정보가 포함될 수 있습니다.'
                     : language === 'VI'
-                    ? 'Điều khoản này quy định các điều kiện, quyền và trách nhiệm giữa Công ty TNHH Templock Vietnam (sau đây gọi là "Công ty") và người dùng khi truy cập nền tảng StockTemp (stocktemp.com). Dịch vụ hoạt động như một công cụ trực quan hóa dữ liệu và mô phỏng toán học dựa trên các cổng API tài chính công khai.'
-                    : 'These terms govern the use of the StockTemp platform operated by Templock Vietnam Co., Ltd. StockTemp functions solely as an educational financial data visualization and mathematical simulation tool.'}
+                    ? 'Điều khoản này quy định các điều kiện, quyền và trách nhiệm giữa Công ty TNHH Templock Vietnam (sau đây gọi là "Công ty") và người dùng khi truy cập nền tảng StockTemp (stocktemp.com). Dịch vụ hoạt động như một công cụ trực quan hóa dữ liệu và mô phỏng toán học dựa trên các cổng API tài chính công khai. Một số nội dung thảo luận và dữ liệu bình chọn có thể bao gồm dữ liệu mô phỏng nhằm phục vụ mục đích minh họa và trải nghiệm người dùng.'
+                    : 'These terms govern the use of the StockTemp platform operated by Templock Vietnam Co., Ltd. StockTemp functions solely as an educational financial data visualization and mathematical simulation tool. Certain discussion feeds and sentiment metrics may include automated simulation data for demonstration and visualization purposes.'}
                 </p>
               </div>
 
