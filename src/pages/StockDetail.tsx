@@ -164,9 +164,16 @@ export default function StockDetail() {
     const fairPrice = calculateFairPrice(stock.eps, stock.defaultTargetPe || 15)
     const temp = calculateStockTemperature(currentPrice, fairPrice)
 
+    const stockCountry: 'KR' | 'US' | 'VN' | 'CN' = (stock.country as 'KR' | 'US' | 'VN' | 'CN') || 
+      (stock.id?.startsWith('KR_') || /^\d{6}$/.test(stock.ticker) ? 'KR' :
+       stock.id?.startsWith('US_') || /^[A-Z]{1,5}$/.test(stock.ticker) ? 'US' :
+       stock.id?.startsWith('VN_') ? 'VN' :
+       stock.id?.startsWith('CN_') ? 'CN' : 'KR')
+
     checkAndTriggerDailyAgentSimulation(id, {
       name: language === 'KO' ? (stock.koreanName || stock.name) : stock.name,
       ticker: stock.ticker,
+      country: stockCountry,
       currentPrice,
       fairPrice,
       temperature: temp,

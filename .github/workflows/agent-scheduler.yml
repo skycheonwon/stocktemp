@@ -2,8 +2,11 @@ name: AI Investor Agent Autonomous Scheduler
 
 on:
   schedule:
-    # Runs 3 times a day (KST 09:15, 13:15, 18:15 -> UTC 00:15, 04:15, 09:15)
-    - cron: '15 0,4,9 * * *'
+    # Runs 3 times a day at realistic market hours:
+    # 1. 00:30 UTC (09:30 KST) -> Asian market open & US market close recap
+    # 2. 05:00 UTC (14:00 KST) -> Mid-day Asian market & European pre-market
+    # 3. 13:30 UTC (22:30 KST) -> US market regular trading open
+    - cron: '30 0,5,13 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 jobs:
